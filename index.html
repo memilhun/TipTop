@@ -31,7 +31,6 @@
             100% { opacity: 0; transform: translateY(-20px); }
         }
         .bonus-anim { animation: fade-up 1.5s ease-out forwards; }
-        
         @supports (-webkit-touch-callout: none) {
             .h-screen-ios { height: -webkit-fill-available; }
         }
@@ -125,11 +124,6 @@
     <canvas id="game-canvas"></canvas>
 
     <script>
-        /**
-         * TipTop Game Engine - Refactored v3.1 (iOS Fix)
-         * State: Production-Ready
-         */
-
         const CONFIG = {
             GAME_DURATION: 90,
             PHYSICS: { 
@@ -175,9 +169,9 @@
             update(lvl, tilt, keys, bounds) {
                 const accel = CONFIG.PHYSICS.ACCEL_BASE + (Math.min(5, lvl) * CONFIG.PHYSICS.ACCEL_INC);
                 
-                // iOS Fix: Ensure tilt values are processed correctly
+                // FIXED: Direction inversion fixed (ay now matches tilt.beta directly)
                 let ax = (tilt.gamma || 0) * accel;
-                let ay = -(tilt.beta || 0) * accel;
+                let ay = (tilt.beta || 0) * accel;
 
                 if (keys['ArrowLeft'] || keys['a']) ax -= accel * 10;
                 if (keys['ArrowRight'] || keys['d']) ax += accel * 10;
@@ -272,7 +266,7 @@
                 dimensions: { width: 0, height: 0 }
             },
             input: {
-                tilt: { beta: 0, gamma: 0, initialBeta: null, initialGamma: null },
+                tilt: { beta: 0, gamma: 0 },
                 keys: {},
                 wakeLock: null,
                 sensorsBound: false
@@ -326,7 +320,6 @@
                 window.addEventListener('keydown', e => this.input.keys[e.key] = true);
                 window.addEventListener('keyup', e => this.input.keys[e.key] = false);
 
-                // FIXED: Sequence of events for iOS sensor permission
                 document.getElementById('quick-start-btn').onclick = () => this.handleStartRequest(this.state.maxLevel, false);
                 document.getElementById('restart-btn').onclick = () => this.showMenu();
                 document.getElementById('back-to-menu-btn').onclick = () => this.showMenu();
@@ -346,7 +339,6 @@
             },
 
             async handleStartRequest(lvl, isSingle) {
-                // FIXED: Request permission FIRST to maintain user gesture context
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     try {
                         const res = await DeviceOrientationEvent.requestPermission();
@@ -356,12 +348,11 @@
                     this.bindSensors();
                 }
 
-                // THEN request wakeLock (non-critical)
                 try {
                     if ('wakeLock' in navigator) {
                         this.input.wakeLock = await navigator.wakeLock.request('screen');
                     }
-                } catch (err) { /* Silent fail */ }
+                } catch (err) {}
 
                 this.startGame(lvl, isSingle);
             },
@@ -370,16 +361,11 @@
                 if (this.input.sensorsBound) return;
                 
                 const onOrientation = (e) => {
-                    // Calibrate on first valid data
-                    if (this.input.tilt.initialBeta === null && e.beta !== null) {
-                        this.input.tilt.initialBeta = e.beta;
-                        this.input.tilt.initialGamma = e.gamma;
-                    }
-
-                    // Process and normalize values
-                    // Landscape handling could be added here if needed
-                    this.input.tilt.beta = e.beta - (this.input.tilt.initialBeta || e.beta);
-                    this.input.tilt.gamma = e.gamma - (this.input.tilt.initialGamma || e.gamma);
+                    // Logic: Direction corrected for ball movement logic.
+                    // Beta: -90 to 90 (tilt forward/backward)
+                    // Gamma: -90 to 90 (tilt left/right)
+                    this.input.tilt.beta = e.beta || 0;
+                    this.input.tilt.gamma = e.gamma || 0;
                 };
 
                 window.addEventListener('deviceorientation', onOrientation, true);
@@ -413,12 +399,26 @@
             },
 
             resetProgress() {
-                if (confirm("Minden adat törlődik. Biztosan?")) {
+                const overlay = document.createElement('div');
+                overlay.className = "fixed inset-0 bg-black/50 z-[100] flex items-center justify-center pointer-events-auto";
+                overlay.innerHTML = `
+                    <div class="glass p-8 rounded-3xl text-center max-w-xs mx-4">
+                        <p class="text-white font-bold mb-6">Minden adat törlődik. Biztosan?</p>
+                        <div class="flex gap-4">
+                            <button id="confirm-reset" class="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold">IGEN</button>
+                            <button id="cancel-reset" class="flex-1 bg-gray-600 text-white py-3 rounded-xl font-bold">NEM</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                document.getElementById('confirm-reset').onclick = () => {
                     localStorage.removeItem(CONFIG.SAVE_KEY);
                     this.state.maxLevel = 1;
                     this.state.bestStars = {};
                     this.loadProgress();
-                }
+                    overlay.remove();
+                };
+                document.getElementById('cancel-reset').onclick = () => overlay.remove();
             },
 
             calculateTotalStars() {
@@ -462,10 +462,6 @@
                 this.state.timeLeft = LEVELS[this.state.currentLevel].timeLimit;
                 this.state.waiting = false;
                 
-                // FIXED: Ensure sensor calibration resets on level start
-                this.input.tilt.initialBeta = null;
-                this.input.tilt.initialGamma = null;
-
                 this.dom.startScreen.classList.add('hidden');
                 this.dom.gameOverScreen.classList.add('hidden');
                 this.dom.levelCompleteScreen.classList.add('hidden');
