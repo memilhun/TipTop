@@ -3,96 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TipTop - Egyensúlyozó Játék</title>
+    <title>TipTop - Refactor Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             touch-action: none;
-            background-color: #1a1a1a;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #121212;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-        #game-canvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-        }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+        #game-canvas { display: block; }
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
     </style>
 </head>
 <body>
 
     <!-- UI Overlay -->
-    <div id="ui-container" class="fixed inset-0 pointer-events-none flex flex-col justify-between p-6">
+    <div id="ui" class="fixed inset-0 pointer-events-none flex flex-col justify-between p-6 z-10">
         <div class="flex justify-between items-start pointer-events-auto">
-            <div class="glass-panel text-white px-4 py-2 rounded-2xl">
-                <p class="text-xs uppercase opacity-70">Pontszám</p>
-                <p id="score-display" class="text-2xl font-bold">0</p>
+            <div class="glass text-white px-5 py-3 rounded-2xl">
+                <p class="text-[10px] uppercase tracking-widest opacity-50 font-bold">Pontszám</p>
+                <p id="score-display" class="text-3xl font-black">0</p>
             </div>
-            <div id="timer-container" class="glass-panel text-white px-4 py-2 rounded-2xl text-right transition-colors duration-300">
-                <p class="text-xs uppercase opacity-70">Hátralévő idő</p>
-                <p id="timer-display" class="text-2xl font-bold">90.0s</p>
+            <div id="timer-card" class="glass text-white px-5 py-3 rounded-2xl text-right transition-all">
+                <p class="text-[10px] uppercase tracking-widest opacity-50 font-bold">Idő</p>
+                <p id="timer-display" class="text-3xl font-black tabular-nums">90.0s</p>
             </div>
         </div>
 
         <!-- Start Screen -->
-        <div id="start-screen" class="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 transition-opacity duration-500">
-            <div id="start-card" class="glass-panel p-8 rounded-3xl text-center max-w-md mx-4 shadow-2xl overflow-y-auto max-h-[90vh]">
-                <h1 class="text-3xl font-bold text-white mb-4">TipTop</h1>
-                
-                <div id="desktop-view" class="hidden">
-                    <p class="text-gray-300 mb-4 text-sm">Használd a mobilod giroszkópját!</p>
-                    <div class="bg-white p-3 rounded-xl inline-block mb-4">
-                        <img id="qr-code" src="" alt="QR kód" class="w-48 h-48 bg-gray-100">
-                    </div>
-                </div>
-
-                <div id="mobile-view">
-                    <p class="text-gray-300 mb-6 leading-relaxed">
-                        Egyensúlyozz a golyóval a zöld célpontig! Kerüld el a fekete lyukakat. 
-                        Döntsd a telefonod a golyó irányításához!
-                    </p>
-
-                    <div class="text-left mb-6 space-y-3">
-                        <div class="p-3 bg-white/5 rounded-xl">
-                            <h3 class="text-blue-400 font-bold text-sm uppercase mb-1">Dinamikus akadályok</h3>
-                            <p class="text-gray-300 text-sm leading-relaxed">Vigyázz! 5 pont felett a lyukak elkezdenek mozogni!</p>
-                        </div>
-                    </div>
-
-                    <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-600/20">
-                        JÁTÉK INDÍTÁSA
-                    </button>
-                    <button id="switch-to-qr" class="mt-6 text-gray-400 text-xs underline">QR-kód mutatása</button>
-                </div>
+        <div id="start-screen" class="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/60 transition-opacity duration-500">
+            <div class="glass p-10 rounded-[2rem] text-center max-w-sm mx-4 shadow-2xl">
+                <h1 class="text-5xl font-extrabold text-white mb-6 tracking-tighter">TipTop</h1>
+                <p class="text-gray-400 mb-8 leading-relaxed">
+                    Egyensúlyozz a golyóval a zöld célpontig! <br>
+                    <span class="text-blue-400 font-medium">Döntsd a telefonod az irányításhoz.</span>
+                </p>
+                <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-900/40 transition-transform active:scale-95">
+                    JÁTÉK INDÍTÁSA
+                </button>
             </div>
         </div>
 
         <!-- Game Over Screen -->
-        <div id="game-over-screen" class="hidden absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/95">
-            <div class="glass-panel p-10 rounded-3xl text-center max-w-sm mx-4">
-                <h2 class="text-4xl font-black text-white mb-2">IDŐ LEJÁRT!</h2>
-                <div class="text-7xl font-black text-blue-500 mb-8" id="final-score">0</div>
-                <button id="restart-btn" class="w-full bg-white text-black font-bold py-4 rounded-xl">ÚJ JÁTÉK</button>
+        <div id="game-over-screen" class="hidden absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90">
+            <div class="glass p-12 rounded-[2.5rem] text-center max-w-sm mx-4 border-red-500/20">
+                <h2 class="text-2xl font-bold text-red-500 mb-2 uppercase tracking-widest">Idő lejárt</h2>
+                <div class="text-8xl font-black text-white mb-10" id="final-score">0</div>
+                <button id="restart-btn" class="w-full bg-white text-black font-black py-5 rounded-2xl hover:bg-gray-200 transition-all">
+                    ÚJRAPRÓBÁLOM
+                </button>
             </div>
         </div>
 
-        <!-- Flash Message -->
-        <div id="msg-box" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div id="msg-content" class="glass-panel px-8 py-4 rounded-full text-white font-bold text-2xl">
-                +1 PONT!
-            </div>
-        </div>
+        <!-- Notification box -->
+        <div id="msg-layer" class="absolute inset-0 flex items-center justify-center pointer-events-none"></div>
         
-        <div id="countdown-box" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div class="flex flex-col items-center">
-                <div class="text-red-500 text-xl font-bold mb-2 uppercase tracking-widest">Újraindulás</div>
-                <div id="countdown-timer" class="text-white text-7xl font-black">3</div>
+        <!-- Penalty Countdown -->
+        <div id="penalty-layer" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none bg-red-500/10">
+            <div class="text-center">
+                <p class="text-red-500 font-black tracking-widest uppercase mb-2">Újraindulás...</p>
+                <p id="penalty-timer" class="text-white text-8xl font-black">3</p>
             </div>
         </div>
     </div>
@@ -100,309 +76,322 @@
     <canvas id="game-canvas"></canvas>
 
     <script>
+        /**
+         * CONFIGURATION
+         */
         const CONFIG = {
             GAME_DURATION: 90,
-            BALL_RADIUS: 12,
-            HOLE_RADIUS: 18,
-            GOAL_RADIUS: 25,
-            POWERUP_RADIUS: 15,
-            BASE_FRICTION: 0.97,
-            BASE_ACCEL: 0.08, 
+            PHYSICS: {
+                FRICTION: 0.97,
+                ACCEL_BASE: 0.08,
+                ACCEL_INC: 0.005,
+                BOUNCE: -0.5
+            },
+            ENTITIES: {
+                BALL_RADIUS: 12,
+                HOLE_RADIUS: 18,
+                GOAL_RADIUS: 25,
+                POWERUP_RADIUS: 15
+            },
             COLORS: {
                 BALL: '#ffffff',
                 HOLE: '#000000',
                 GOAL: '#22c55e',
                 POWERUP: '#fbbf24',
-                BG: '#1a1a1a'
+                BG: '#121212'
             }
         };
 
-        const state = {
-            active: false,
-            waiting: false,
-            gameOver: false,
-            score: 0,
-            timeLeft: CONFIG.GAME_DURATION,
-            ball: { x: 0, y: 0, vx: 0, vy: 0 },
-            tilt: { beta: 0, gamma: 0 },
-            holes: [],
-            goal: { x: 0, y: 0 },
-            powerup: null,
-            lastUpdate: 0,
-            canvas: null,
-            ctx: null,
-            deathInterval: null
-        };
-
-        function init() {
-            state.canvas = document.getElementById('game-canvas');
-            state.ctx = state.canvas.getContext('2d');
-            resize();
-            window.addEventListener('resize', resize);
-            detectDevice();
-            
-            document.getElementById('start-btn').addEventListener('click', handleStartClick);
-            document.getElementById('restart-btn').addEventListener('click', restartGame);
-            document.getElementById('switch-to-qr').addEventListener('click', showDesktopQR);
-        }
-
-        function detectDevice() {
-            const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-            if (!isTouch) showDesktopQR();
-            else updateQR();
-        }
-
-        function showDesktopQR() {
-            document.getElementById('mobile-view').classList.add('hidden');
-            document.getElementById('desktop-view').classList.remove('hidden');
-            updateQR();
-        }
-
-        function updateQR() {
-            let url = window.location.href;
-            document.getElementById('qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}&ecc=M`;
-        }
-
-        function resize() {
-            state.canvas.width = window.innerWidth;
-            state.canvas.height = window.innerHeight;
-            if (state.active && state.holes.length === 0) generateLevel();
-        }
-
-        async function handleStartClick() {
-            if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                const permission = await DeviceOrientationEvent.requestPermission();
-                if (permission !== 'granted') return;
+        /**
+         * ENTITY CLASSES
+         */
+        class Ball {
+            constructor() {
+                this.reset();
             }
-            startRunning();
+            reset() {
+                this.x = 60;
+                this.y = 60;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = CONFIG.ENTITIES.BALL_RADIUS;
+            }
+            update(tilt, score) {
+                const accel = CONFIG.PHYSICS.ACCEL_BASE + (Math.min(10, score) * CONFIG.PHYSICS.ACCEL_INC);
+                this.vx += tilt.gamma * accel;
+                this.vy += tilt.beta * accel;
+                this.vx *= CONFIG.PHYSICS.FRICTION;
+                this.vy *= CONFIG.PHYSICS.FRICTION;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.handleBounds();
+            }
+            handleBounds() {
+                if (this.x < this.radius || this.x > window.innerWidth - this.radius) {
+                    this.vx *= CONFIG.PHYSICS.BOUNCE;
+                    this.x = this.x < this.radius ? this.radius : window.innerWidth - this.radius;
+                }
+                if (this.y < this.radius || this.y > window.innerHeight - this.radius) {
+                    this.vy *= CONFIG.PHYSICS.BOUNCE;
+                    this.y = this.y < this.radius ? this.radius : window.innerHeight - this.radius;
+                }
+            }
+            draw(ctx, isWaiting) {
+                if (isWaiting && Math.floor(Date.now() / 200) % 2 === 0) return;
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = "white";
+                ctx.fillStyle = CONFIG.COLORS.BALL;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
         }
 
-        function startRunning() {
-            document.getElementById('start-screen').classList.add('hidden');
-            state.active = true;
-            state.gameOver = false;
-            state.score = 0;
-            state.timeLeft = CONFIG.GAME_DURATION;
-            state.lastUpdate = performance.now();
-            window.addEventListener('deviceorientation', e => {
-                state.tilt.beta = e.beta || 0;
-                state.tilt.gamma = e.gamma || 0;
-            }, true);
-            generateLevel();
-            requestAnimationFrame(gameLoop);
-        }
-
-        function restartGame() {
-            document.getElementById('game-over-screen').classList.add('hidden');
-            state.score = 0;
-            state.timeLeft = CONFIG.GAME_DURATION;
-            state.gameOver = false;
-            document.getElementById('score-display').innerText = "0";
-            generateLevel();
-        }
-
-        function generateLevel() {
-            const w = state.canvas.width, h = state.canvas.height;
-            state.ball.x = 60; state.ball.y = 60;
-            state.ball.vx = 0; state.ball.vy = 0;
-            
-            // Goal placement with path clearance
-            do {
-                state.goal.x = Math.random() * (w - 160) + 80;
-                state.goal.y = Math.random() * (h - 160) + 80;
-            } while (Math.hypot(state.goal.x - state.ball.x, state.goal.y - state.ball.y) < w * 0.5);
-
-            // Powerup
-            state.powerup = (Math.random() < 0.4) ? {
-                x: Math.random() * (w - 160) + 80,
-                y: Math.random() * (h - 160) + 80,
-                active: true
-            } : null;
-
-            // Holes Logic: Cluster and Motion
-            state.holes = [];
-            const holeCount = 3 + Math.floor(state.score / 2);
-            for (let i = 0; i < holeCount; i++) {
-                let hx, hy;
+        class Hole {
+            constructor(w, h, ballPos, goalPos, score) {
+                this.radius = CONFIG.ENTITIES.HOLE_RADIUS;
+                this.scoreAtSpawn = score;
+                this.generateValidPos(w, h, ballPos, goalPos);
+                
+                this.isMoving = score > 5;
+                if (this.isMoving) {
+                    const speed = Math.random() * 2 + 1;
+                    const angle = Math.random() * Math.PI * 2;
+                    this.vx = Math.cos(angle) * speed;
+                    this.vy = Math.sin(angle) * speed;
+                    this.range = 50 + Math.random() * 100;
+                    this.baseX = this.x;
+                    this.baseY = this.y;
+                }
+            }
+            generateValidPos(w, h, ballPos, goalPos) {
                 let attempts = 0;
                 do {
-                    hx = Math.random() * (w - 60) + 30;
-                    hy = Math.random() * (h - 60) + 30;
+                    this.x = Math.random() * (w - 60) + 30;
+                    this.y = Math.random() * (h - 60) + 30;
                     attempts++;
                 } while (
-                    (Math.hypot(hx - state.ball.x, hy - state.ball.y) < 110 || 
-                     Math.hypot(hx - state.goal.x, hy - state.goal.y) < 90) && attempts < 100
+                    attempts < 100 && (
+                        Math.hypot(this.x - ballPos.x, this.y - ballPos.y) < 110 ||
+                        Math.hypot(this.x - goalPos.x, this.y - goalPos.y) < 90
+                    )
                 );
-
-                // Add motion if score > 5
-                let speed = (state.score > 5) ? (Math.random() * 2 + 1) : 0;
-                let angle = Math.random() * Math.PI * 2;
-
-                state.holes.push({ 
-                    x: hx, 
-                    y: hy, 
-                    baseX: hx, 
-                    baseY: hy, 
-                    vx: Math.cos(angle) * speed, 
-                    vy: Math.sin(angle) * speed,
-                    range: 50 + Math.random() * 100 
-                });
             }
-        }
-
-        function update(dt) {
-            if (!state.active || state.waiting || state.gameOver) return;
-
-            state.timeLeft -= dt / 1000;
-            if (state.timeLeft <= 0) {
-                state.timeLeft = 0;
-                state.gameOver = true;
-                document.getElementById('final-score').innerText = state.score;
-                document.getElementById('game-over-screen').classList.remove('hidden');
+            update() {
+                if (!this.isMoving) return;
+                this.x += this.vx;
+                this.y += this.vy;
+                if (Math.abs(this.x - this.baseX) > this.range || this.x < 20 || this.x > window.innerWidth - 20) this.vx *= -1;
+                if (Math.abs(this.y - this.baseY) > this.range || this.y < 20 || this.y > window.innerHeight - 20) this.vy *= -1;
             }
-            
-            const timerDisplay = document.getElementById('timer-display');
-            timerDisplay.innerText = state.timeLeft.toFixed(1) + 's';
-            if (state.timeLeft < 10) timerDisplay.classList.add('text-red-500');
-            else timerDisplay.classList.remove('text-red-500');
-
-            // Physics
-            const accel = CONFIG.BASE_ACCEL + (Math.min(10, state.score) * 0.005);
-            const friction = Math.min(0.99, CONFIG.BASE_FRICTION + (Math.min(10, state.score) * 0.001));
-
-            state.ball.vx += state.tilt.gamma * accel;
-            state.ball.vy += state.tilt.beta * accel;
-            state.ball.vx *= friction;
-            state.ball.vy *= friction;
-            state.ball.x += state.ball.vx;
-            state.ball.y += state.ball.vy;
-
-            // Wall bounce
-            if (state.ball.x < CONFIG.BALL_RADIUS || state.ball.x > state.canvas.width - CONFIG.BALL_RADIUS) state.ball.vx *= -0.5;
-            if (state.ball.y < CONFIG.BALL_RADIUS || state.ball.y > state.canvas.height - CONFIG.BALL_RADIUS) state.ball.vy *= -0.5;
-            state.ball.x = Math.max(CONFIG.BALL_RADIUS, Math.min(state.canvas.width - CONFIG.BALL_RADIUS, state.ball.x));
-            state.ball.y = Math.max(CONFIG.BALL_RADIUS, Math.min(state.canvas.height - CONFIG.BALL_RADIUS, state.ball.y));
-
-            // Goal
-            if (Math.hypot(state.ball.x - state.goal.x, state.ball.y - state.goal.y) < CONFIG.GOAL_RADIUS) {
-                state.score++;
-                document.getElementById('score-display').innerText = state.score;
-                showMsg("+1 PONT!", "text-green-400");
-                generateLevel();
-            }
-
-            // Powerup
-            if (state.powerup && state.powerup.active) {
-                if (Math.hypot(state.ball.x - state.powerup.x, state.ball.y - state.powerup.y) < CONFIG.POWERUP_RADIUS + CONFIG.BALL_RADIUS) {
-                    state.powerup.active = false;
-                    state.timeLeft += 5;
-                    showMsg("+5 MÁSODPERC!", "text-yellow-400");
-                }
-            }
-
-            // Holes Update (Motion)
-            for (let hole of state.holes) {
-                if (hole.vx !== 0 || hole.vy !== 0) {
-                    hole.x += hole.vx;
-                    hole.y += hole.vy;
-
-                    // Bounce holes off invisible range boundaries or screen
-                    if (Math.abs(hole.x - hole.baseX) > hole.range || hole.x < 20 || hole.x > state.canvas.width - 20) hole.vx *= -1;
-                    if (Math.abs(hole.y - hole.baseY) > hole.range || hole.y < 20 || hole.y > state.canvas.height - 20) hole.vy *= -1;
-                }
-
-                if (Math.hypot(state.ball.x - hole.x, state.ball.y - hole.y) < CONFIG.HOLE_RADIUS - 2) {
-                    startDeathSequence();
-                    break;
-                }
-            }
-        }
-
-        function startDeathSequence() {
-            if (state.waiting || state.gameOver) return;
-            state.waiting = true;
-            state.ball.vx = 0; state.ball.vy = 0;
-            const box = document.getElementById('countdown-box');
-            const timer = document.getElementById('countdown-timer');
-            box.classList.remove('hidden');
-            let left = 3;
-            timer.innerText = left;
-            if (state.deathInterval) clearInterval(state.deathInterval);
-            state.deathInterval = setInterval(() => {
-                left--;
-                if (left > 0) timer.innerText = left;
-                else {
-                    clearInterval(state.deathInterval);
-                    box.classList.add('hidden');
-                    state.waiting = false;
-                    state.ball.x = 60; state.ball.y = 60;
-                }
-            }, 1000);
-        }
-
-        function showMsg(txt, colorClass) {
-            const box = document.getElementById('msg-box');
-            const content = document.getElementById('msg-content');
-            content.innerText = txt;
-            content.className = `glass-panel px-8 py-4 rounded-full font-bold text-2xl animate-bounce ${colorClass}`;
-            box.classList.remove('hidden');
-            setTimeout(() => box.classList.add('hidden'), 1000);
-        }
-
-        function draw() {
-            const ctx = state.ctx;
-            if (!ctx) return;
-            ctx.fillStyle = CONFIG.COLORS.BG;
-            ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
-
-            // Goal
-            ctx.shadowBlur = 20; ctx.shadowColor = CONFIG.COLORS.GOAL;
-            ctx.fillStyle = CONFIG.COLORS.GOAL;
-            ctx.beginPath(); ctx.arc(state.goal.x, state.goal.y, CONFIG.GOAL_RADIUS, 0, Math.PI * 2); ctx.fill();
-
-            // Powerup
-            if (state.powerup && state.powerup.active) {
-                ctx.shadowBlur = 15; ctx.shadowColor = CONFIG.COLORS.POWERUP;
-                ctx.fillStyle = CONFIG.COLORS.POWERUP;
-                ctx.beginPath();
-                const r = CONFIG.POWERUP_RADIUS;
-                const cx = state.powerup.x, cy = state.powerup.y;
-                for (let i = 0; i < 5; i++) {
-                    ctx.lineTo(cx + r * Math.cos((18 + i * 72) * Math.PI / 180), cy - r * Math.sin((18 + i * 72) * Math.PI / 180));
-                    ctx.lineTo(cx + r/2 * Math.cos((54 + i * 72) * Math.PI / 180), cy - r/2 * Math.sin((54 + i * 72) * Math.PI / 180));
-                }
-                ctx.closePath(); ctx.fill();
-            }
-
-            // Holes
-            ctx.shadowBlur = 0;
-            for (let hole of state.holes) {
+            draw(ctx) {
                 ctx.fillStyle = CONFIG.COLORS.HOLE;
-                ctx.beginPath(); ctx.arc(hole.x, hole.y, CONFIG.HOLE_RADIUS, 0, Math.PI * 2); ctx.fill();
-                // Subtle outline for moving holes
-                if (hole.vx !== 0) {
-                    ctx.strokeStyle = "rgba(59, 130, 246, 0.3)";
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                if (this.isMoving) {
+                    ctx.strokeStyle = "rgba(59, 130, 246, 0.4)";
                     ctx.lineWidth = 2;
                     ctx.stroke();
                 }
             }
+        }
 
-            // Ball
-            if (!state.waiting || Math.floor(Date.now() / 200) % 2 === 0) {
-                ctx.shadowBlur = 15; ctx.shadowColor = "white";
-                ctx.fillStyle = CONFIG.COLORS.BALL;
-                ctx.beginPath(); ctx.arc(state.ball.x, state.ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
+        /**
+         * GAME ENGINE
+         */
+        const Game = {
+            state: {
+                active: false,
+                gameOver: false,
+                waiting: false,
+                score: 0,
+                timeLeft: CONFIG.GAME_DURATION,
+                tilt: { beta: 0, gamma: 0 }
+            },
+            entities: {
+                ball: new Ball(),
+                holes: [],
+                goal: { x: 0, y: 0 },
+                powerup: null
+            },
+            
+            init() {
+                this.canvas = document.getElementById('game-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                
+                document.getElementById('start-btn').onclick = () => this.requestAuth();
+                document.getElementById('restart-btn').onclick = () => this.reset();
+                
+                this.loop();
+            },
+
+            async requestAuth() {
+                if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const res = await DeviceOrientationEvent.requestPermission();
+                    if (res !== 'granted') return;
+                }
+                this.start();
+            },
+
+            start() {
+                document.getElementById('start-screen').classList.add('opacity-0');
+                setTimeout(() => document.getElementById('start-screen').classList.add('hidden'), 500);
+                this.state.active = true;
+                window.addEventListener('deviceorientation', e => {
+                    this.state.tilt.beta = e.beta || 0;
+                    this.state.tilt.gamma = e.gamma || 0;
+                }, true);
+                this.generateLevel();
+            },
+
+            reset() {
+                this.state.score = 0;
+                this.state.timeLeft = CONFIG.GAME_DURATION;
+                this.state.gameOver = false;
+                this.state.waiting = false;
+                document.getElementById('score-display').innerText = "0";
+                document.getElementById('game-over-screen').classList.add('hidden');
+                this.generateLevel();
+            },
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            },
+
+            generateLevel() {
+                const w = this.canvas.width, h = this.canvas.height;
+                this.entities.ball.reset();
+                
+                // Goal
+                do {
+                    this.entities.goal.x = Math.random() * (w - 160) + 80;
+                    this.entities.goal.y = Math.random() * (h - 160) + 80;
+                } while (Math.hypot(this.entities.goal.x - this.entities.ball.x, this.entities.goal.y - this.entities.ball.y) < w * 0.4);
+
+                // Powerup
+                this.entities.powerup = (Math.random() < 0.35) ? {
+                    x: Math.random() * (w - 160) + 80,
+                    y: Math.random() * (h - 160) + 80,
+                    active: true
+                } : null;
+
+                // Holes
+                this.entities.holes = [];
+                const count = 3 + Math.floor(this.state.score / 2);
+                for(let i=0; i<count; i++) {
+                    this.entities.holes.push(new Hole(w, h, this.entities.ball, this.entities.goal, this.state.score));
+                }
+            },
+
+            triggerPenalty() {
+                if (this.state.waiting || this.state.gameOver) return;
+                this.state.waiting = true;
+                const layer = document.getElementById('penalty-layer');
+                const timer = document.getElementById('penalty-timer');
+                layer.classList.remove('hidden');
+                
+                let count = 3;
+                timer.innerText = count;
+                const itv = setInterval(() => {
+                    count--;
+                    if (count > 0) timer.innerText = count;
+                    else {
+                        clearInterval(itv);
+                        layer.classList.add('hidden');
+                        this.state.waiting = false;
+                        this.entities.ball.reset();
+                    }
+                }, 1000);
+            },
+
+            update(dt) {
+                if (!this.state.active || this.state.gameOver) return;
+
+                // Timer runs even during penalty
+                this.state.timeLeft -= dt / 1000;
+                if (this.state.timeLeft <= 0) {
+                    this.state.timeLeft = 0;
+                    this.state.gameOver = true;
+                    document.getElementById('final-score').innerText = this.state.score;
+                    document.getElementById('game-over-screen').classList.remove('hidden');
+                    return;
+                }
+
+                document.getElementById('timer-display').innerText = this.state.timeLeft.toFixed(1) + 's';
+                if (this.state.timeLeft < 10) document.getElementById('timer-card').classList.add('bg-red-600/40');
+
+                if (this.state.waiting) return;
+
+                // Entities update
+                this.entities.ball.update(this.state.tilt, this.state.score);
+                this.entities.holes.forEach(h => h.update());
+
+                // Collisions: Goal
+                if (Math.hypot(this.entities.ball.x - this.entities.goal.x, this.entities.ball.y - this.entities.goal.y) < CONFIG.ENTITIES.GOAL_RADIUS) {
+                    this.state.score++;
+                    document.getElementById('score-display').innerText = this.state.score;
+                    this.generateLevel();
+                }
+
+                // Collisions: Holes
+                for (let h of this.entities.holes) {
+                    if (Math.hypot(this.entities.ball.x - h.x, this.entities.ball.y - h.y) < CONFIG.ENTITIES.HOLE_RADIUS - 2) {
+                        this.triggerPenalty();
+                        break;
+                    }
+                }
+                
+                // Collisions: Powerup
+                const p = this.entities.powerup;
+                if (p && p.active && Math.hypot(this.entities.ball.x - p.x, this.entities.ball.y - p.y) < CONFIG.ENTITIES.POWERUP_RADIUS + 10) {
+                    p.active = false;
+                    this.state.timeLeft += 5;
+                }
+            },
+
+            draw() {
+                this.ctx.fillStyle = CONFIG.COLORS.BG;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                if (!this.state.active) return;
+
+                // Goal
+                this.ctx.fillStyle = CONFIG.COLORS.GOAL;
+                this.ctx.beginPath();
+                this.ctx.arc(this.entities.goal.x, this.entities.goal.y, CONFIG.ENTITIES.GOAL_RADIUS, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Powerup
+                if (this.entities.powerup?.active) {
+                    this.ctx.fillStyle = CONFIG.COLORS.POWERUP;
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.entities.powerup.x, this.entities.powerup.y, CONFIG.ENTITIES.POWERUP_RADIUS, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Holes
+                this.entities.holes.forEach(h => h.draw(this.ctx));
+
+                // Ball
+                this.entities.ball.draw(this.ctx, this.state.waiting);
+            },
+
+            loop(t) {
+                const dt = t - (this.lastTime || t);
+                this.lastTime = t;
+                this.update(dt);
+                this.draw();
+                requestAnimationFrame(t => this.loop(t));
             }
-        }
+        };
 
-        function gameLoop(t) {
-            update(t - (state.lastUpdate || t));
-            state.lastUpdate = t;
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-
-        window.onload = init;
+        window.onload = () => Game.init();
     </script>
 </body>
 </html>
