@@ -307,7 +307,7 @@
             },
 
             async requestAuth() {
-                // MODIFIKÁCIÓ: iOS WebKit policy fix. Az engedélykérésnek kell az első szinkron ágban lennie.
+                requestWakeLock();
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     try {
                         const res = await DeviceOrientationEvent.requestPermission();
@@ -318,10 +318,7 @@
                 } else {
                     this.bindSensors();
                 }
-                
-                // A WakeLock aszinkron elindul, de nem blokkolja a felhasználói gesztus láncot.
-                requestWakeLock();
-                
+                               
                 this.start();
             },
 
