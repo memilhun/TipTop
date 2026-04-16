@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Egyensúlyozó - PWA Játék</title>
+    <title>Egyensúlyozó - Időre Futam</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -34,16 +34,17 @@
     </style>
 </head>
 <body>
+
     <!-- UI Overlay -->
     <div id="ui-container" class="fixed inset-0 pointer-events-none flex flex-col justify-between p-6">
         <div class="flex justify-between items-start pointer-events-auto">
             <div class="glass-panel text-white px-4 py-2 rounded-2xl">
-                <p class="text-xs uppercase opacity-70">Szint</p>
-                <p id="level-display" class="text-2xl font-bold">1</p>
+                <p class="text-xs uppercase opacity-70">Pontszám</p>
+                <p id="score-display" class="text-2xl font-bold">0</p>
             </div>
             <div class="glass-panel text-white px-4 py-2 rounded-2xl text-right">
-                <p class="text-xs uppercase opacity-70">Idő</p>
-                <p id="timer-display" class="text-2xl font-bold">0.0s</p>
+                <p class="text-xs uppercase opacity-70">Hátralévő idő</p>
+                <p id="timer-display" class="text-2xl font-bold">90.0s</p>
             </div>
         </div>
 
@@ -53,27 +54,22 @@
                 <h1 class="text-3xl font-bold text-white mb-4">Egyensúlyozó</h1>
                 
                 <div id="desktop-view" class="hidden">
-                    <p class="text-gray-300 mb-4 text-sm">Ehhez a játékhoz a telefonod mozgásérzékelőjére (giroszkóp) van szükség. Asztali gépen a játék nem játszható.</p>
+                    <p class="text-gray-300 mb-4 text-sm">Ehhez a játékhoz a telefonod mozgásérzékelőjére (giroszkóp) van szükség.</p>
                     <div class="bg-white p-3 rounded-xl inline-block mb-4 shadow-xl">
                         <img id="qr-code" src="" alt="QR kód" class="w-48 h-48 bg-gray-100">
                     </div>
-                    <p class="text-blue-400 text-sm font-semibold mb-2 text-balance">Olvasd be a QR-kódot a mobiloddal a folytatáshoz!</p>
-                    <div class="text-[10px] text-gray-500 bg-black/20 p-2 rounded break-all select-all mt-2" id="url-display"></div>
+                    <p class="text-blue-400 text-sm font-semibold mb-2">Olvasd be a QR-kódot a mobiloddal!</p>
                 </div>
 
                 <div id="mobile-view">
                     <div class="text-left mb-6 space-y-3">
                         <div class="p-3 bg-white/5 rounded-xl">
-                            <h3 class="text-blue-400 font-bold text-sm uppercase mb-1">A cél</h3>
-                            <p class="text-gray-300 text-sm leading-relaxed">Vezesd a fehér golyót a zöld célterületre! Minden szinttel nehezebb pálya vár.</p>
-                        </div>
-                        <div class="p-3 bg-white/5 rounded-xl">
-                            <h3 class="text-blue-400 font-bold text-sm uppercase mb-1">Hogyan játssz?</h3>
-                            <p class="text-gray-300 text-sm leading-relaxed">Döntsd a telefonodat abba az irányba, amerre a golyót gurítani szeretnéd.</p>
+                            <h3 class="text-blue-400 font-bold text-sm uppercase mb-1">A kihívás</h3>
+                            <p class="text-gray-300 text-sm leading-relaxed">90 másodperced van a lehető legtöbb golyót a zöld célba juttatni. Minden sikeres golyó után nehezebb pálya jön!</p>
                         </div>
                         <div class="p-3 bg-white/5 rounded-xl border border-red-500/20">
-                            <h3 class="text-red-400 font-bold text-sm uppercase mb-1">Veszélyek</h3>
-                            <p class="text-gray-300 text-sm leading-relaxed">Kerüld el a fekete lyukakat! Ha beleesel, várakoznod kell az újraindulásig.</p>
+                            <h3 class="text-red-400 font-bold text-sm uppercase mb-1">Akadályok</h3>
+                            <p class="text-gray-300 text-sm leading-relaxed">A fekete lyukak 3 másodpercre megállítják a golyót, és értékes időt veszítesz!</p>
                         </div>
                     </div>
 
@@ -81,20 +77,30 @@
                         <span>JÁTÉK INDÍTÁSA</span>
                     </button>
                     
-                    <button id="switch-to-qr" class="mt-6 text-gray-400 text-xs underline hover:text-white transition-colors">
-                        Asztali gépen vagyok, mutasd a QR-kódot
-                    </button>
+                    <button id="switch-to-qr" class="mt-6 text-gray-400 text-xs underline">QR-kód mutatása</button>
 
                     <div id="error-msg" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
-                        A mozgásérzékelő nem küld adatot. HTTPS kapcsolat szükséges!
+                        Mozgásérzékelő hiba. HTTPS szükséges!
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="hidden absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90 transition-opacity duration-500">
+            <div class="glass-panel p-10 rounded-3xl text-center max-w-sm mx-4 shadow-2xl">
+                <h2 class="text-4xl font-black text-white mb-2">IDŐ LEJÁRT!</h2>
+                <p class="text-gray-400 uppercase tracking-widest mb-6">Végső pontszám</p>
+                <div class="text-7xl font-black text-blue-500 mb-8" id="final-score">0</div>
+                <button id="restart-btn" class="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200 transition-all active:scale-95">
+                    ÚJ JÁTÉK
+                </button>
+            </div>
+        </div>
+
         <div id="msg-box" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none">
             <div id="msg-content" class="glass-panel px-8 py-4 rounded-full text-white font-bold text-2xl animate-pulse">
-                SZINT TELJESÍTVE!
+                +1 PONT!
             </div>
         </div>
 
@@ -110,10 +116,11 @@
 
     <script>
         const CONFIG = {
+            GAME_DURATION: 90,
             BALL_RADIUS: 12,
             HOLE_RADIUS: 18,
             GOAL_RADIUS: 25,
-            BASE_FRICTION: 0.97, // Kicsit erősebb alapfékezés a kontrollért
+            BASE_FRICTION: 0.97,
             BASE_ACCEL: 0.08, 
             COLORS: {
                 BALL: '#ffffff',
@@ -126,8 +133,9 @@
         const state = {
             active: false,
             waiting: false,
-            level: 1,
-            time: 0,
+            gameOver: false,
+            score: 0,
+            timeLeft: CONFIG.GAME_DURATION,
             ball: { x: 0, y: 0, vx: 0, vy: 0 },
             tilt: { beta: 0, gamma: 0 },
             holes: [],
@@ -135,7 +143,6 @@
             lastUpdate: 0,
             canvas: null,
             ctx: null,
-            receivedData: false,
             deathInterval: null
         };
 
@@ -147,6 +154,7 @@
             detectDevice();
             
             document.getElementById('start-btn').addEventListener('click', handleStartClick);
+            document.getElementById('restart-btn').addEventListener('click', restartGame);
             document.getElementById('switch-to-qr').addEventListener('click', showDesktopQR);
         }
 
@@ -165,18 +173,13 @@
 
         function updateQR() {
             let currentUrl = window.location.href;
-            try {
-                if (window.self !== window.top) currentUrl = document.referrer || window.location.href;
-            } catch (e) {}
-            document.getElementById('url-display').innerText = currentUrl;
+            try { if (window.self !== window.top) currentUrl = document.referrer || window.location.href; } catch (e) {}
             document.getElementById('qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentUrl)}&ecc=M`;
         }
 
         function resize() {
             state.canvas.width = window.innerWidth;
             state.canvas.height = window.innerHeight;
-            // Átméretezéskor csak akkor generálunk új pályát, ha még nem indult el a játék, 
-            // különben játék közben elugranának a lyukak.
             if (state.active && state.holes.length === 0) generateLevel();
         }
 
@@ -186,9 +189,6 @@
                     const permission = await DeviceOrientationEvent.requestPermission();
                     if (permission !== 'granted') return;
                 }
-                window.addEventListener('deviceorientation', (e) => {
-                    if (e.beta !== null) state.receivedData = true;
-                }, { once: true });
                 startRunning();
             } catch (err) {
                 document.getElementById('error-msg').classList.remove('hidden');
@@ -196,15 +196,24 @@
         }
 
         function startRunning() {
-            document.getElementById('start-screen').style.opacity = '0';
-            setTimeout(() => document.getElementById('start-screen').classList.add('hidden'), 500);
+            document.getElementById('start-screen').classList.add('hidden');
             state.active = true;
-            state.level = 1;
-            state.time = 0;
+            state.gameOver = false;
+            state.score = 0;
+            state.timeLeft = CONFIG.GAME_DURATION;
             state.lastUpdate = performance.now();
             window.addEventListener('deviceorientation', handleOrientation, true);
             generateLevel();
             requestAnimationFrame(gameLoop);
+        }
+
+        function restartGame() {
+            document.getElementById('game-over-screen').classList.add('hidden');
+            state.score = 0;
+            state.timeLeft = CONFIG.GAME_DURATION;
+            state.gameOver = false;
+            document.getElementById('score-display').innerText = "0";
+            generateLevel();
         }
 
         function handleOrientation(event) {
@@ -224,39 +233,44 @@
             
             const margin = 80;
             let attemptsGoal = 0;
-            // Célpont generálása távol a starttól
             do {
                 state.goal.x = Math.random() * (w - margin * 2) + margin;
                 state.goal.y = Math.random() * (h - margin * 2) + margin;
                 attemptsGoal++;
-            } while (Math.hypot(state.goal.x - state.ball.x, state.goal.y - state.ball.y) < w * 0.6 && attemptsGoal < 50);
+            } while (Math.hypot(state.goal.x - state.ball.x, state.goal.y - state.ball.y) < w * 0.5 && attemptsGoal < 50);
 
             state.holes = [];
-            const holeCount = 3 + (state.level * 2);
+            // A nehézség (lyukak száma) a pontszámmal nő
+            const holeCount = 3 + Math.floor(state.score / 2);
             for (let i = 0; i < holeCount; i++) {
                 let hx, hy, attempts = 0;
                 do {
                     hx = Math.random() * (w - 60) + 30;
                     hy = Math.random() * (h - 60) + 30;
                     attempts++;
-                    const safetyDist = state.level < 3 ? 120 : 70;
+                    const safetyDist = state.score < 5 ? 120 : 70;
                     const distToStart = Math.hypot(hx - state.ball.x, hy - state.ball.y);
                     const distToGoal = Math.hypot(hx - state.goal.x, hy - state.goal.y);
                     if (distToStart > 100 && distToGoal > safetyDist) break;
                 } while (attempts < 50);
                 state.holes.push({ x: hx, y: hy });
             }
-            document.getElementById('level-display').innerText = state.level;
         }
 
         function update(dt) {
-            if (!state.active || state.waiting) return;
-            state.time += dt / 1000;
-            document.getElementById('timer-display').innerText = state.time.toFixed(1) + 's';
+            if (!state.active || state.waiting || state.gameOver) return;
 
-            // Fizikai paraméterek finomhangolása szintenként
-            const currentAccel = CONFIG.BASE_ACCEL + (state.level * 0.012);
-            const currentFriction = Math.min(0.995, CONFIG.BASE_FRICTION + (state.level * 0.001));
+            // Időmérés
+            state.timeLeft -= dt / 1000;
+            if (state.timeLeft <= 0) {
+                state.timeLeft = 0;
+                endGame();
+            }
+            document.getElementById('timer-display').innerText = state.timeLeft.toFixed(1) + 's';
+
+            // Fizika (nehézség skálázása a pontszámmal)
+            const currentAccel = CONFIG.BASE_ACCEL + (Math.min(10, state.score) * 0.005);
+            const currentFriction = Math.min(0.99, CONFIG.BASE_FRICTION + (Math.min(10, state.score) * 0.001));
 
             state.ball.vx += state.tilt.gamma * currentAccel;
             state.ball.vy += state.tilt.beta * currentAccel;
@@ -265,18 +279,21 @@
             state.ball.x += state.ball.vx;
             state.ball.y += state.ball.vy;
 
-            // Falak
+            // Fal ütközések
             if (state.ball.x < CONFIG.BALL_RADIUS) { state.ball.x = CONFIG.BALL_RADIUS; state.ball.vx *= -0.4; }
             if (state.ball.x > state.canvas.width - CONFIG.BALL_RADIUS) { state.ball.x = state.canvas.width - CONFIG.BALL_RADIUS; state.ball.vx *= -0.4; }
             if (state.ball.y < CONFIG.BALL_RADIUS) { state.ball.y = CONFIG.BALL_RADIUS; state.ball.vy *= -0.4; }
             if (state.ball.y > state.canvas.height - CONFIG.BALL_RADIUS) { state.ball.y = state.canvas.height - CONFIG.BALL_RADIUS; state.ball.vy *= -0.4; }
 
-            // Cél
+            // Cél elérése
             if (Math.hypot(state.ball.x - state.goal.x, state.ball.y - state.goal.y) < CONFIG.GOAL_RADIUS) {
-                nextLevel();
+                state.score++;
+                document.getElementById('score-display').innerText = state.score;
+                showMsg("+1 PONT!");
+                generateLevel();
             }
 
-            // Lyukak
+            // Lyukba esés
             for (let hole of state.holes) {
                 if (Math.hypot(state.ball.x - hole.x, state.ball.y - hole.y) < CONFIG.HOLE_RADIUS - 2) {
                     startDeathSequence();
@@ -285,14 +302,14 @@
             }
         }
 
-        function nextLevel() {
-            state.level++;
-            showMsg("SZINT TELJESÍTVE!");
-            generateLevel();
+        function endGame() {
+            state.gameOver = true;
+            document.getElementById('final-score').innerText = state.score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
         }
 
         function startDeathSequence() {
-            if (state.waiting) return;
+            if (state.waiting || state.gameOver) return;
             state.waiting = true;
             state.ball.vx = 0; state.ball.vy = 0;
 
@@ -321,7 +338,6 @@
             state.waiting = false;
             state.ball.x = 60; state.ball.y = 60;
             state.ball.vx = 0; state.ball.vy = 0;
-            showMsg("HAJRÁ!");
         }
 
         function showMsg(txt) {
@@ -329,7 +345,7 @@
             const content = document.getElementById('msg-content');
             content.innerText = txt;
             box.classList.remove('hidden');
-            setTimeout(() => box.classList.add('hidden'), 1200);
+            setTimeout(() => box.classList.add('hidden'), 1000);
         }
 
         function draw() {
@@ -353,8 +369,8 @@
             ctx.shadowBlur = 20; ctx.shadowColor = CONFIG.COLORS.GOAL;
             ctx.beginPath(); ctx.arc(state.goal.x, state.goal.y, CONFIG.GOAL_RADIUS, 0, Math.PI * 2); ctx.fill();
 
-            // Golyó
-            if (!state.waiting || Math.floor(Date.now() / 200) % 2 === 0) { // Villogás halál után
+            // Golyó (villogás várakozáskor)
+            if (!state.waiting || Math.floor(Date.now() / 200) % 2 === 0) {
                 ctx.fillStyle = CONFIG.COLORS.BALL;
                 ctx.shadowBlur = 15; ctx.shadowColor = "white";
                 ctx.beginPath(); ctx.arc(state.ball.x, state.ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
