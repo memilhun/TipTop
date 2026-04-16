@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- CONFIGURATION ISOLATION: Nincs külső sebezhető JS lib, a Tailwind CDN fejlesztői célra megfelelő, de éles környezetben statikus build javasolt (NIST best practice). -->
     <title>TipTop - Refactor Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -306,13 +307,21 @@
             },
 
             async requestAuth() {
-                await requestWakeLock();
-                if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    const res = await DeviceOrientationEvent.requestPermission();
-                    if (res === 'granted') this.bindSensors();
+                // MODIFIKÁCIÓ: iOS WebKit policy fix. Az engedélykérésnek kell az első szinkron ágban lennie.
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    try {
+                        const res = await DeviceOrientationEvent.requestPermission();
+                        if (res === 'granted') this.bindSensors();
+                    } catch (err) {
+                        console.warn('Orientation auth hiba', err);
+                    }
                 } else {
                     this.bindSensors();
                 }
+                
+                // A WakeLock aszinkron elindul, de nem blokkolja a felhasználói gesztus láncot.
+                requestWakeLock();
+                
                 this.start();
             },
 
