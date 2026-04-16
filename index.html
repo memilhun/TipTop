@@ -114,17 +114,12 @@
     <canvas id="game-canvas"></canvas>
 
     <script>
-    // ÚJ: Wake Lock változó a globális térben
         let wakeLock = null;
 
-        // ÚJ: Wake Lock kérése függvény
         const requestWakeLock = async () => {
             try {
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('Wake Lock aktív: A képernyő nem fog elaludni.');
-                    
-                    // Ha a tab fókuszát veszti (pl. váltás), újra kell kérni, ha visszajön
                     wakeLock.addEventListener('release', () => {
                         console.log('Wake Lock kioldva.');
                     });
@@ -185,16 +180,21 @@
                 this.radius = CONFIG.ENTITIES.BALL_RADIUS;
             }
             update(tilt, currentLevel) {
-                    const accel = CONFIG.PHYSICS.ACCEL_BASE + (Math.min(5, currentLevel) * CONFIG.PHYSICS.ACCEL_INC);
-                    this.vx += (currentTilt.gamma || 0) * accel;
-                    this.vy += (currentTilt.beta || 0) * accel;
-                    
-                    this.vx *= CONFIG.PHYSICS.FRICTION;
-                    this.vy *= CONFIG.PHYSICS.FRICTION;
-                    this.x += this.vx;
-                    this.y += this.vy;
-                    this.handleBounds();
-                }
+                const accel = CONFIG.PHYSICS.ACCEL_BASE + (Math.min(5, currentLevel) * CONFIG.PHYSICS.ACCEL_INC);
+                
+                // CRITICAL: Expliciten a currentTilt-et használjuk, null checkel
+                const targetGamma = currentTilt.gamma || 0;
+                const targetBeta = currentTilt.beta || 0;
+
+                this.vx += targetGamma * accel;
+                this.vy += targetBeta * accel;
+                
+                this.vx *= CONFIG.PHYSICS.FRICTION;
+                this.vy *= CONFIG.PHYSICS.FRICTION;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.handleBounds();
+            }
             handleBounds() {
                 if (this.x < this.radius) {
                     this.vx *= CONFIG.PHYSICS.BOUNCE;
@@ -347,14 +347,13 @@
                 });
             },
 
-        // MÓDOSÍTOTT requestAuth: Itt hívjuk meg a Wake Lock-ot is!
-        async requestAuth() {
+            async requestAuth() {
                 await requestWakeLock();                
                 try {
                     if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
                         const res = await DeviceOrientationEvent.requestPermission();
                         if (res === 'granted') {
-                            // JAVÍTÁS: Azonnal regisztráljuk a figyelőt a grant után
+                            // JAVÍTÁS: Robusztusabb listener regisztráció
                             window.addEventListener('deviceorientation', (e) => {
                                 currentTilt.beta = e.beta || 0;
                                 currentTilt.gamma = e.gamma || 0;
@@ -364,7 +363,6 @@
                             alert('A játékhoz mozgásérzékelő szükséges.');
                         }
                     } else {
-                        // Nem iOS eszköz (pl. Android vagy régebbi mobil)
                         window.addEventListener('deviceorientation', (e) => {
                             currentTilt.beta = e.beta || 0;
                             currentTilt.gamma = e.gamma || 0;
@@ -377,16 +375,10 @@
                 }
             },
 
-            // Figyeljük, ha a felhasználó visszatér a tabra, aktiváljuk újra
             handleVisibilityChange() {
                 if (wakeLock !== null && document.visibilityState === 'visible') {
                     requestWakeLock();
                 }
-            },
-
-            handleOrientation(e) {
-                this.state.tilt.beta = e.beta || 0;
-                this.state.tilt.gamma = e.gamma || 0;
             },
 
             reset() {
@@ -606,7 +598,6 @@
                 };
                 localStorage.setItem('tiptop_progress', JSON.stringify(progress));
                 
-                // Frissítjük a start screen feliratát is azonnal
                 if (this.dom.saveInfo) {
                     this.dom.saveInfo.innerText = `Legutóbbi mentés: Level ${this.state.currentLevel} - ${this.state.totalScore} pont`;
                 }
@@ -619,7 +610,6 @@
                     this.state.currentLevel = progress.currentLevel || 1;
                     this.state.totalScore = progress.totalScore || 0;
                     
-                    // UI frissítése a betöltött adatokkal
                     if (this.dom.saveInfo) {
                         this.dom.saveInfo.innerText = `Legutóbbi mentés: Level ${this.state.currentLevel} - ${this.state.totalScore} pont`;
                         this.dom.saveInfo.classList.remove('hidden');
