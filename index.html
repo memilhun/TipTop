@@ -50,23 +50,38 @@
 
         <!-- Start/Error/Desktop Screen -->
         <div id="start-screen" class="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 transition-opacity duration-500">
-            <div id="start-card" class="glass-panel p-8 rounded-3xl text-center max-w-md mx-4 shadow-2xl">
+            <div id="start-card" class="glass-panel p-8 rounded-3xl text-center max-w-md mx-4 shadow-2xl overflow-y-auto max-h-[90vh]">
                 <h1 class="text-3xl font-bold text-white mb-4">Egyensúlyozó</h1>
                 
                 <!-- Desktop View -->
                 <div id="desktop-view" class="hidden">
-                    <p class="text-gray-300 mb-4">Ehhez a játékhoz a telefonod mozgásérzékelőjére van szükség.</p>
+                    <p class="text-gray-300 mb-4 text-sm">Ehhez a játékhoz a telefonod mozgásérzékelőjére (giroszkóp) van szükség. Asztali gépen a játék nem játszható.</p>
                     <div class="bg-white p-3 rounded-xl inline-block mb-4 shadow-xl">
                         <img id="qr-code" src="" alt="QR kód" class="w-48 h-48 bg-gray-100">
                     </div>
-                    <p class="text-blue-400 text-sm font-semibold mb-2">Olvasd be a QR-kódot!</p>
-                    <div class="text-[10px] text-gray-500 bg-black/20 p-2 rounded break-all select-all" id="url-display"></div>
+                    <p class="text-blue-400 text-sm font-semibold mb-2 text-balance">Olvasd be a QR-kódot a mobiloddal a folytatáshoz!</p>
+                    <div class="text-[10px] text-gray-500 bg-black/20 p-2 rounded break-all select-all mt-2" id="url-display"></div>
                 </div>
 
                 <!-- Mobile View -->
                 <div id="mobile-view">
-                    <p id="start-desc" class="text-gray-300 mb-8">Döntsd a telefonod a golyó irányításához. Kerüld el a lyukakat!</p>
-                    <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                    <!-- Játék leírása -->
+                    <div class="text-left mb-6 space-y-3">
+                        <div class="p-3 bg-white/5 rounded-xl">
+                            <h3 class="text-blue-400 font-bold text-sm uppercase mb-1">A cél</h3>
+                            <p class="text-gray-300 text-sm leading-relaxed">Vezesd a fehér golyót a zöld célterületre! Minden szinttel nehezebb pálya vár, több akadállyal.</p>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-xl">
+                            <h3 class="text-blue-400 font-bold text-sm uppercase mb-1">Hogyan játssz?</h3>
+                            <p class="text-gray-300 text-sm leading-relaxed">Döntsd a telefonodat abba az irányba, amerre a golyót gurítani szeretnéd. Minél jobban döntöd, annál gyorsabban gyorsul.</p>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-xl border border-red-500/20">
+                            <h3 class="text-red-400 font-bold text-sm uppercase mb-1">Veszélyek</h3>
+                            <p class="text-gray-300 text-sm leading-relaxed">Kerüld el a fekete lyukakat! Ha beleesel, a golyó visszakerül a szint elejére.</p>
+                        </div>
+                    </div>
+
+                    <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all transform active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20">
                         <span>JÁTÉK INDÍTÁSA</span>
                     </button>
                     
@@ -75,7 +90,7 @@
                     </button>
 
                     <div id="error-msg" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
-                        A mozgásérzékelő nem küld adatot. HTTPS kapcsolat szükséges!
+                        A mozgásérzékelő nem küld adatot. HTTPS kapcsolat és mobil böngésző szükséges!
                     </div>
                 </div>
             </div>
@@ -149,10 +164,7 @@
         }
 
         function updateQR() {
-            // Megpróbáljuk kinyerni a legtisztább URL-t
             let currentUrl = window.location.href;
-            
-            // Ha iframe-ben vagyunk, megpróbáljuk a szülő URL-t, de ha az tiltott, maradunk az eredetinél
             try {
                 if (window.self !== window.top) {
                     currentUrl = document.referrer || window.location.href;
@@ -163,7 +175,6 @@
 
             document.getElementById('url-display').innerText = currentUrl;
             const qrImg = document.getElementById('qr-code');
-            // QR API hívása tisztított URL-lel
             qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentUrl)}&ecc=M`;
         }
 
