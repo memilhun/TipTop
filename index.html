@@ -177,7 +177,7 @@
                 
                 // iOS Fix: Ensure tilt values are processed correctly
                 let ax = (tilt.gamma || 0) * accel;
-                let ay = (tilt.beta || 0) * accel;
+                let ay = -(tilt.beta || 0) * accel;
 
                 if (keys['ArrowLeft'] || keys['a']) ax -= accel * 10;
                 if (keys['ArrowRight'] || keys['d']) ax += accel * 10;
