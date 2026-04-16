@@ -113,6 +113,26 @@
     <canvas id="game-canvas"></canvas>
 
     <script>
+    // ÚJ: Wake Lock változó a globális térben
+        let wakeLock = null;
+
+        // ÚJ: Wake Lock kérése függvény
+        const requestWakeLock = async () => {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake Lock aktív: A képernyő nem fog elaludni.');
+                    
+                    // Ha a tab fókuszát veszti (pl. váltás), újra kell kérni, ha visszajön
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake Lock kioldva.');
+                    });
+                }
+            } catch (err) {
+                console.error(`${err.name}, ${err.message}`);
+            }
+        };
+
         const CONFIG = {
             GAME_DURATION: 90,
             PHYSICS: {
@@ -321,8 +341,12 @@
                 });
             },
 
+        // MÓDOSÍTOTT requestAuth: Itt hívjuk meg a Wake Lock-ot is!
             async requestAuth() {
+                // 1. Kérjük a Wake Lock-ot (iOS Safari 16.4+ támogatja)
+                await requestWakeLock();                
                 try {
+                    // 2. Mozgásérzékelő engedélyezése (marad az eredeti)
                     if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
                         const res = await DeviceOrientationEvent.requestPermission();
                         if (res !== 'granted') {
@@ -334,6 +358,13 @@
                 } catch (e) {
                     console.error("Auth error:", e);
                     this.start(); 
+                }
+            },
+
+            // Figyeljük, ha a felhasználó visszatér a tabra, aktiváljuk újra
+            handleVisibilityChange() {
+                if (wakeLock !== null && document.visibilityState === 'visible') {
+                    requestWakeLock();
                 }
             },
 
