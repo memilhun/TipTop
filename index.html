@@ -22,9 +22,7 @@
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .level-card {
-            transition: all 0.2s ease;
-        }
+        .level-card { transition: all 0.2s ease; }
         .level-card.locked { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
         @keyframes fade-up {
             0% { opacity: 0; transform: translateY(20px); }
@@ -64,9 +62,7 @@
                     <span id="total-stars-count" class="text-white font-bold text-xl">0</span>
                 </div>
                 
-                <div id="level-grid" class="grid grid-cols-3 gap-3 mb-8">
-                    <!-- Dinamikusan generált szintek -->
-                </div>
+                <div id="level-grid" class="grid grid-cols-3 gap-3 mb-8"></div>
 
                 <p class="text-gray-400 text-xs mb-6 leading-relaxed">
                     Döntsd a telefonod vagy használd a nyilakat a navigációhoz!
@@ -94,9 +90,9 @@
             <div class="glass p-12 rounded-[2.5rem] text-center max-w-sm mx-4">
                 <h2 class="text-2xl font-bold text-green-500 mb-4 uppercase tracking-widest">Szint teljesítve!</h2>
                 <div id="stars-display" class="flex justify-center gap-3 mb-6">
-                    <span class="text-5xl opacity-30 transition-all duration-300">⭐</span>
-                    <span class="text-5xl opacity-30 transition-all duration-300">⭐</span>
-                    <span class="text-5xl opacity-30 transition-all duration-300">⭐</span>
+                    <span class="text-5xl transition-all duration-300">⭐</span>
+                    <span class="text-5xl transition-all duration-300">⭐</span>
+                    <span class="text-5xl transition-all duration-300">⭐</span>
                 </div>
                 <div class="mb-6">
                     <p class="text-gray-400 text-sm mb-1">Elért pontszám</p>
@@ -125,7 +121,6 @@
     <canvas id="game-canvas"></canvas>
 
     <script>
-        // CONFIGURATION ISOLATION
         const CONFIG = {
             GAME_DURATION: 90,
             PHYSICS: { FRICTION: 0.97, ACCEL_BASE: 0.08, ACCEL_INC: 0.005, BOUNCE: -0.5 },
@@ -146,7 +141,6 @@
             9: { holes: 13, holeSpeed: 2.5, goalDistance: 0.8, powerupChance: 0.1, timeLimit: 60, starsThreshold: [15, 25, 35] }
         };
         
-        // ÁLLAPOTKEZELÉS
         let wakeLock = null;
         const currentTilt = { beta: 0, gamma: 0 };
         const keys = {};
@@ -458,32 +452,43 @@
                 this.state.active = false;
                 const activeLvl = this.state.currentLevel;
                 const data = LEVELS[activeLvl];
-                let stars = 0;
+                const score = this.state.levelScore;
                 
-                if (this.state.levelScore >= data.starsThreshold[2]) stars = 3;
-                else if (this.state.levelScore >= data.starsThreshold[1]) stars = 2;
-                else if (this.state.levelScore >= data.starsThreshold[0]) stars = 1;
+                // Csillag logika szigorú ellenőrzése
+                let stars = 0;
+                if (score >= data.starsThreshold[2]) stars = 3;
+                else if (score >= data.starsThreshold[1]) stars = 2;
+                else if (score >= data.starsThreshold[0]) stars = 1;
 
-                // Mentés logikájának javítása: az aktuális szint (activeLvl) adatait frissítjük
-                if (!this.state.bestStars[activeLvl] || stars > this.state.bestStars[activeLvl]) {
+                // Rekord frissítés
+                const previousBest = this.state.bestStars[activeLvl] || 0;
+                if (stars > previousBest) {
                     this.state.bestStars[activeLvl] = stars;
                 }
 
-                // Szintfeloldás: ha legalább 1 csillag van és az utolsó feloldott szintet játszotta
+                // Szint feloldás
                 if (stars >= 1 && activeLvl === this.state.maxLevel && activeLvl < Object.keys(LEVELS).length) {
                     this.state.maxLevel = activeLvl + 1;
                 }
                 
                 this.saveProgress();
 
-                document.getElementById('level-score-display').innerText = this.state.levelScore;
+                // UI Frissítés
+                document.getElementById('level-score-display').innerText = score;
                 const starSpans = document.getElementById('stars-display').querySelectorAll('span');
+                
                 starSpans.forEach((s, i) => {
-                    s.className = `text-5xl transition-all duration-300 ${i < stars ? 'opacity-100 scale-110' : 'opacity-20'}`;
+                    // Resetelünk minden osztályt az egyértelműség kedvéért
+                    s.classList.remove('opacity-100', 'scale-110', 'opacity-20');
+                    if (i < stars) {
+                        s.classList.add('opacity-100', 'scale-110');
+                    } else {
+                        s.classList.add('opacity-20');
+                    }
                 });
 
                 const nextBtn = document.getElementById('next-level-btn');
-                if (this.state.isSingleMode) {
+                if (this.state.isSingleMode || !LEVELS[activeLvl + 1]) {
                     nextBtn.classList.add('hidden');
                 } else {
                     nextBtn.classList.remove('hidden');
