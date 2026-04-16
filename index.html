@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TipTop - v2.2</title>
+    <title>TipTop - v2.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -53,7 +53,7 @@
             </div>
         </div>
 
-        <!-- START SCREEN / LEVEL SELECT -->
+        <!-- START SCREEN -->
         <div id="start-screen" class="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 transition-opacity duration-500 overflow-y-auto py-10">
             <div class="glass p-8 rounded-[2rem] text-center w-full max-w-lg mx-4 shadow-2xl relative">
                 <h1 class="text-5xl font-extrabold text-white mb-2 tracking-tighter">TipTop</h1>
@@ -65,17 +65,15 @@
                 <div id="level-grid" class="grid grid-cols-3 gap-3 mb-8"></div>
 
                 <p class="text-gray-400 text-xs mb-6 leading-relaxed">
-                    Döntsd a telefonod vagy használd a nyilakat a navigációhoz!
+                    Döntsd a telefonod vagy használd a nyilakat!
                 </p>
                 
                 <div class="flex flex-col gap-3">
                     <button id="quick-start-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-xl transition-transform active:scale-95 uppercase tracking-widest">
                         Folytatás
                     </button>
-                    
-                    <!-- RESET PROGRESS BUTTON -->
                     <button id="reset-data-btn" class="w-full bg-red-900/40 hover:bg-red-800/60 text-red-200 font-bold py-3 rounded-2xl transition-all text-xs uppercase tracking-widest border border-red-500/20">
-                        Adatok törlése (Visszaállítás)
+                        Adatok törlése
                     </button>
                 </div>
             </div>
@@ -261,7 +259,6 @@
                 };
 
                 this.loadProgress();
-                this.renderLevelGrid();
                 this.resize();
 
                 window.addEventListener('resize', () => this.resize());
@@ -271,8 +268,6 @@
                 document.getElementById('quick-start-btn').onclick = () => this.requestAuth(this.state.maxLevel, false);
                 document.getElementById('restart-btn').onclick = () => this.showMenu();
                 document.getElementById('back-to-menu-btn').onclick = () => this.showMenu();
-                
-                // RESET EVENT LISTENER
                 document.getElementById('reset-data-btn').onclick = () => this.resetProgress();
 
                 document.getElementById('next-level-btn').onclick = () => {
@@ -292,14 +287,17 @@
             loadProgress() {
                 const saved = localStorage.getItem(CONFIG.SAVE_KEY);
                 if (saved) {
-                    const data = JSON.parse(saved);
-                    this.state.maxLevel = data.maxLevel || 1;
-                    this.state.bestStars = data.bestStars || {};
-                } else {
-                    this.state.maxLevel = 1;
-                    this.state.bestStars = {};
+                    try {
+                        const data = JSON.parse(saved);
+                        this.state.maxLevel = data.maxLevel || 1;
+                        this.state.bestStars = data.bestStars || {};
+                    } catch (e) {
+                        this.state.maxLevel = 1;
+                        this.state.bestStars = {};
+                    }
                 }
                 this.calculateTotalStars();
+                this.renderLevelGrid();
             },
 
             saveProgress() {
@@ -309,21 +307,17 @@
                 }));
             },
 
-            // RESET LOGIC
             resetProgress() {
-                const confirmReset = window.confirm("Biztosan törölni szeretnéd az összes mentett adatot? Ez a művelet nem vonható vissza.");
-                if (confirmReset) {
+                if (confirm("Minden adat törlődik. Biztosan?")) {
                     localStorage.removeItem(CONFIG.SAVE_KEY);
                     this.state.maxLevel = 1;
                     this.state.bestStars = {};
-                    this.state.totalStars = 0;
-                    this.calculateTotalStars();
-                    this.renderLevelGrid();
+                    this.loadProgress();
                 }
             },
 
             calculateTotalStars() {
-                this.state.totalStars = Object.values(this.state.bestStars).reduce((a, b) => a + b, 0);
+                this.state.totalStars = Object.values(this.state.bestStars).reduce((a, b) => a + (parseInt(b) || 0), 0);
                 this.dom.totalStarsText.innerText = this.state.totalStars;
             },
 
@@ -332,7 +326,7 @@
                 Object.keys(LEVELS).forEach(lvlId => {
                     const id = parseInt(lvlId);
                     const isLocked = id > this.state.maxLevel;
-                    const starCount = this.state.bestStars[id] || 0;
+                    const starCount = parseInt(this.state.bestStars[id]) || 0;
                     
                     const div = document.createElement('div');
                     div.className = `level-card glass p-3 rounded-xl cursor-pointer ${isLocked ? 'locked' : 'hover:bg-white/10'}`;
@@ -350,16 +344,25 @@
             },
 
             async requestAuth(lvl, isSingle) {
-                requestWakeLock();
+                await requestWakeLock();
+                // iOS Sensor Permission Handler Fix
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     try {
                         const res = await DeviceOrientationEvent.requestPermission();
-                        if (res === 'granted') this.bindSensors();
-                    } catch (e) {}
+                        if (res === 'granted') {
+                            this.bindSensors();
+                            this.startGame(lvl, isSingle);
+                        } else {
+                            // Amennyiben elutasítják, akkor is elindul billentyűzettel
+                            this.startGame(lvl, isSingle);
+                        }
+                    } catch (e) {
+                        this.startGame(lvl, isSingle);
+                    }
                 } else {
                     this.bindSensors();
+                    this.startGame(lvl, isSingle);
                 }
-                this.startGame(lvl, isSingle);
             },
 
             bindSensors() {
@@ -393,8 +396,7 @@
                 this.dom.gameOverScreen.classList.add('hidden');
                 this.dom.levelCompleteScreen.classList.add('hidden');
                 this.dom.startScreen.classList.remove('hidden');
-                this.renderLevelGrid();
-                this.calculateTotalStars();
+                this.loadProgress();
             },
 
             generateLevel() {
@@ -487,7 +489,7 @@
                 else if (score >= data.starsThreshold[1]) stars = 2;
                 else if (score >= data.starsThreshold[0]) stars = 1;
 
-                const previousBest = this.state.bestStars[activeLvl] || 0;
+                const previousBest = parseInt(this.state.bestStars[activeLvl]) || 0;
                 if (stars > previousBest) {
                     this.state.bestStars[activeLvl] = stars;
                 }
