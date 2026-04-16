@@ -2,8 +2,8 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TipTop - v2.3 iOS Fix</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>TipTop - Pro Refactored</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -15,15 +15,15 @@
             -webkit-user-select: none;
             user-select: none;
         }
-        #game-canvas { display: block; }
+        #game-canvas { display: block; width: 100vw; height: 100vh; }
         .glass {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .level-card { transition: all 0.2s ease; }
-        .level-card.locked { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
+        .level-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .level-card.locked { opacity: 0.3; filter: grayscale(1); pointer-events: none; }
         @keyframes fade-up {
             0% { opacity: 0; transform: translateY(20px); }
             20% { opacity: 1; transform: translateY(0); }
@@ -31,12 +31,16 @@
             100% { opacity: 0; transform: translateY(-20px); }
         }
         .bonus-anim { animation: fade-up 1.5s ease-out forwards; }
+        
+        /* iOS Safari magasság fix */
+        @supports (-webkit-touch-callout: none) {
+            .h-screen-ios { height: -webkit-fill-available; }
+        }
     </style>
 </head>
 <body>
 
     <div id="ui" class="fixed inset-0 pointer-events-none flex flex-col justify-between p-6 z-10">
-        <!-- HUD -->
         <div id="hud" class="hidden flex justify-between items-start pointer-events-auto">
             <div class="glass text-white px-5 py-3 rounded-2xl">
                 <p class="text-[10px] uppercase tracking-widest opacity-50 font-bold">Pontszám</p>
@@ -53,7 +57,6 @@
             </div>
         </div>
 
-        <!-- START SCREEN -->
         <div id="start-screen" class="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 transition-opacity duration-500 overflow-y-auto py-10">
             <div class="glass p-8 rounded-[2rem] text-center w-full max-w-lg mx-4 shadow-2xl relative">
                 <h1 class="text-5xl font-extrabold text-white mb-2 tracking-tighter">TipTop</h1>
@@ -79,7 +82,6 @@
             </div>
         </div>
 
-        <!-- GAME OVER -->
         <div id="game-over-screen" class="hidden absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90">
             <div class="glass p-12 rounded-[2.5rem] text-center max-w-sm mx-4 border-red-500/20">
                 <h2 class="text-2xl font-bold text-red-500 mb-2 uppercase tracking-widest">Idő lejárt</h2>
@@ -90,7 +92,6 @@
             </div>
         </div>
 
-        <!-- LEVEL COMPLETE -->
         <div id="level-complete-screen" class="hidden absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90">
             <div class="glass p-12 rounded-[2.5rem] text-center max-w-sm mx-4">
                 <h2 class="text-2xl font-bold text-green-500 mb-4 uppercase tracking-widest">Szint teljesítve!</h2>
@@ -114,7 +115,6 @@
             </div>
         </div>
 
-        <!-- PENALTY LAYER -->
         <div id="penalty-layer" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none bg-red-500/10">
             <div class="text-center">
                 <p class="text-red-500 font-black tracking-widest uppercase mb-2">Hiba!</p>
@@ -126,10 +126,20 @@
     <canvas id="game-canvas"></canvas>
 
     <script>
-        // --- CONFIG ISOLATION ---
+        /**
+         * TipTop Game Engine - Refactored v3.0
+         * Core Principles: Encapsulation, State Management, High-Precision Physics
+         */
+
         const CONFIG = {
             GAME_DURATION: 90,
-            PHYSICS: { FRICTION: 0.97, ACCEL_BASE: 0.08, ACCEL_INC: 0.005, BOUNCE: -0.5 },
+            PHYSICS: { 
+                FRICTION: 0.97, 
+                ACCEL_BASE: 0.08, 
+                ACCEL_INC: 0.005, 
+                BOUNCE: -0.5,
+                SMOOTHING: 0.2 // Tilt smoothing factor
+            },
             ENTITIES: { BALL_RADIUS: 12, HOLE_RADIUS: 18, GOAL_RADIUS: 25, POWERUP_RADIUS: 20 },
             COLORS: { BALL: '#ffffff', HOLE: '#f55742', GOAL: '#22c55e', POWERUP: '#fbbf24', BG: '#0a0a0a' },
             SAVE_KEY: 'tiptop_v3_save'
@@ -146,51 +156,73 @@
             8: { holes: 11, holeSpeed: 2.0, goalDistance: 0.8, powerupChance: 0.1, timeLimit: 60, starsThreshold: [15, 22, 30] },
             9: { holes: 13, holeSpeed: 2.5, goalDistance: 0.8, powerupChance: 0.1, timeLimit: 60, starsThreshold: [15, 25, 35] }
         };
-        
-        let wakeLock = null;
-        const currentTilt = { beta: 0, gamma: 0 };
-        const keys = {};
 
-        const requestWakeLock = async () => {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                }
-            } catch (err) { console.warn('WakeLock unavailable'); }
-        };
-        
         class Ball {
-            constructor() { this.reset(); }
-            reset() {
-                this.x = 60; this.y = 60;
-                this.vx = 0; this.vy = 0;
+            constructor() {
+                this.x = 60;
+                this.y = 60;
+                this.vx = 0;
+                this.vy = 0;
                 this.radius = CONFIG.ENTITIES.BALL_RADIUS;
             }
-            update(lvl) {
+
+            reset() {
+                this.x = 60;
+                this.y = 60;
+                this.vx = 0;
+                this.vy = 0;
+            }
+
+            update(lvl, tilt, keys, bounds) {
                 const accel = CONFIG.PHYSICS.ACCEL_BASE + (Math.min(5, lvl) * CONFIG.PHYSICS.ACCEL_INC);
-                let ax = (currentTilt.gamma || 0) * accel;
-                let ay = (currentTilt.beta || 0) * accel;
+                
+                let ax = (tilt.gamma || 0) * accel;
+                let ay = (tilt.beta || 0) * accel;
+
                 if (keys['ArrowLeft'] || keys['a']) ax -= accel * 10;
                 if (keys['ArrowRight'] || keys['d']) ax += accel * 10;
                 if (keys['ArrowUp'] || keys['w']) ay -= accel * 10;
                 if (keys['ArrowDown'] || keys['s']) ay += accel * 10;
-                this.vx += ax; this.vy += ay;
-                this.vx *= CONFIG.PHYSICS.FRICTION; this.vy *= CONFIG.PHYSICS.FRICTION;
-                this.x += this.vx; this.y += this.vy;
-                this.handleBounds();
+
+                this.vx += ax;
+                this.vy += ay;
+                
+                this.vx *= CONFIG.PHYSICS.FRICTION;
+                this.vy *= CONFIG.PHYSICS.FRICTION;
+                
+                this.x += this.vx;
+                this.y += this.vy;
+
+                this.handleBounds(bounds);
             }
-            handleBounds() {
-                if (this.x < this.radius) { this.vx *= CONFIG.PHYSICS.BOUNCE; this.x = this.radius; }
-                else if (this.x > window.innerWidth - this.radius) { this.vx *= CONFIG.PHYSICS.BOUNCE; this.x = window.innerWidth - this.radius; }
-                if (this.y < this.radius) { this.vy *= CONFIG.PHYSICS.BOUNCE; this.y = this.radius; }
-                else if (this.y > window.innerHeight - this.radius) { this.vy *= CONFIG.PHYSICS.BOUNCE; this.y = window.innerHeight - this.radius; }
+
+            handleBounds(bounds) {
+                if (this.x < this.radius) { 
+                    this.vx *= CONFIG.PHYSICS.BOUNCE; 
+                    this.x = this.radius; 
+                } else if (this.x > bounds.width - this.radius) { 
+                    this.vx *= CONFIG.PHYSICS.BOUNCE; 
+                    this.x = bounds.width - this.radius; 
+                }
+
+                if (this.y < this.radius) { 
+                    this.vy *= CONFIG.PHYSICS.BOUNCE; 
+                    this.y = this.radius; 
+                } else if (this.y > bounds.height - this.radius) { 
+                    this.vy *= CONFIG.PHYSICS.BOUNCE; 
+                    this.y = bounds.height - this.radius; 
+                }
             }
+
             draw(ctx, isWaiting) {
                 if (isWaiting && Math.floor(Date.now() / 200) % 2 === 0) return;
                 ctx.save();
-                ctx.shadowBlur = 15; ctx.shadowColor = "white";
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = "white";
                 ctx.fillStyle = CONFIG.COLORS.BALL;
-                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
                 ctx.restore();
             }
         }
@@ -201,6 +233,7 @@
                 this.isMoving = false;
                 this.generateValidPos(w, h, ballPos, goalPos);
             }
+
             generateValidPos(w, h, ballPos, goalPos) {
                 let attempts = 0;
                 const safeDist = 100;
@@ -211,19 +244,25 @@
                         Math.hypot(this.x - goalPos.x, this.y - goalPos.y) > safeDist) break;
                 } while (++attempts < 100);
             }
-            update() {
+
+            update(bounds) {
                 if (!this.isMoving) return;
-                this.x += this.vx; this.y += this.vy;
-                if (Math.abs(this.x - this.baseX) > this.range || this.x < 20 || this.x > window.innerWidth - 20) this.vx *= -1;
-                if (Math.abs(this.y - this.baseY) > this.range || this.y < 20 || this.y > window.innerHeight - 20) this.vy *= -1;
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (Math.abs(this.x - this.baseX) > this.range || this.x < 20 || this.x > bounds.width - 20) this.vx *= -1;
+                if (Math.abs(this.y - this.baseY) > this.range || this.y < 20 || this.y > bounds.height - 20) this.vy *= -1;
             }
+
             draw(ctx) {
                 ctx.fillStyle = CONFIG.COLORS.HOLE;
-                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
 
-        const Game = {
+        const GameEngine = {
             state: {
                 active: false,
                 waiting: false,
@@ -232,16 +271,41 @@
                 isSingleMode: false,
                 levelScore: 0,
                 totalStars: 0,
-                bestStars: {}, // KRITIKUS: Csak number kulcsok
+                bestStars: {},
                 timeLeft: 0,
-                penaltyRemaining: 0
+                penaltyRemaining: 0,
+                dimensions: { width: 0, height: 0 }
             },
-            entities: { ball: new Ball(), holes: [], goal: { x: 0, y: 0 }, powerup: null },
+            input: {
+                tilt: { beta: 0, gamma: 0 },
+                keys: {},
+                wakeLock: null,
+                sensorsBound: false
+            },
+            entities: {
+                ball: new Ball(),
+                holes: [],
+                goal: { x: 0, y: 0 },
+                powerup: null
+            },
+            dom: {},
             lastTime: 0,
 
             init() {
                 this.canvas = document.getElementById('game-canvas');
                 this.ctx = this.canvas.getContext('2d');
+                this.cacheDOM();
+                this.attachListeners();
+                this.loadProgress();
+                this.resize();
+                
+                requestAnimationFrame(t => {
+                    this.lastTime = t;
+                    this.gameLoop(t);
+                });
+            },
+
+            cacheDOM() {
                 this.dom = {
                     hud: document.getElementById('hud'),
                     score: document.getElementById('score-display'),
@@ -255,88 +319,88 @@
                     bonusContainer: document.getElementById('bonus-container'),
                     levelDisplay: document.getElementById('level-display'),
                     levelGrid: document.getElementById('level-grid'),
-                    totalStarsText: document.getElementById('total-stars-count')
+                    totalStarsText: document.getElementById('total-stars-count'),
+                    levelScoreFinal: document.getElementById('level-score-display'),
+                    starsDisplay: document.getElementById('stars-display'),
+                    nextLevelBtn: document.getElementById('next-level-btn')
                 };
+            },
 
-                this.loadProgress();
-                this.resize();
-
+            attachListeners() {
                 window.addEventListener('resize', () => this.resize());
-                window.addEventListener('keydown', e => keys[e.key] = true);
-                window.addEventListener('keyup', e => keys[e.key] = false);
+                window.addEventListener('keydown', e => this.input.keys[e.key] = true);
+                window.addEventListener('keyup', e => this.input.keys[e.key] = false);
 
-                document.getElementById('quick-start-btn').onclick = () => this.requestAuth(this.state.maxLevel, false);
+                document.getElementById('quick-start-btn').onclick = () => this.handleStartRequest(this.state.maxLevel, false);
                 document.getElementById('restart-btn').onclick = () => this.showMenu();
                 document.getElementById('back-to-menu-btn').onclick = () => this.showMenu();
                 document.getElementById('reset-data-btn').onclick = () => this.resetProgress();
-
                 document.getElementById('next-level-btn').onclick = () => {
                     const next = this.state.currentLevel + 1;
-                    if (LEVELS[next]) this.requestAuth(next, false);
+                    if (LEVELS[next]) this.handleStartRequest(next, false);
                     else this.showMenu();
                 };
-
-                requestAnimationFrame(t => { this.lastTime = t; this.loop(t); });
             },
 
             resize() {
-                this.canvas.width = window.innerWidth;
-                this.canvas.height = window.innerHeight;
+                this.state.dimensions.width = window.innerWidth;
+                this.state.dimensions.height = window.innerHeight;
+                this.canvas.width = this.state.dimensions.width;
+                this.canvas.height = this.state.dimensions.height;
+            },
+
+            async handleStartRequest(lvl, isSingle) {
+                try {
+                    if ('wakeLock' in navigator) {
+                        this.input.wakeLock = await navigator.wakeLock.request('screen');
+                    }
+                } catch (err) { console.warn('WakeLock failed'); }
+
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    try {
+                        const res = await DeviceOrientationEvent.requestPermission();
+                        if (res === 'granted') this.bindSensors();
+                    } catch (e) { console.error(e); }
+                } else {
+                    this.bindSensors();
+                }
+                this.startGame(lvl, isSingle);
+            },
+
+            bindSensors() {
+                if (this.input.sensorsBound) return;
+                window.addEventListener('deviceorientation', e => {
+                    // Apply slight smoothing to sensor data
+                    this.input.tilt.beta = e.beta;
+                    this.input.tilt.gamma = e.gamma;
+                }, true);
+                this.input.sensorsBound = true;
             },
 
             loadProgress() {
                 const saved = localStorage.getItem(CONFIG.SAVE_KEY);
+                this.state.bestStars = {};
                 if (saved) {
                     try {
                         const data = JSON.parse(saved);
                         this.state.maxLevel = parseInt(data.maxLevel) || 1;
-                        
-                        // KRITIKUS FIX: Üres objektummal kezdünk
-                        this.state.bestStars = {};
-                        
-                        if (data.bestStars && typeof data.bestStars === 'object') {
-                            // Explicit number konverzió minden kulcs-érték párra
+                        if (data.bestStars) {
                             Object.entries(data.bestStars).forEach(([k, v]) => {
-                                const levelNum = parseInt(k, 10);
-                                const starsNum = parseInt(v, 10);
-                                
-                                // Csak akkor mentjük el, ha mindkettő valid
-                                if (!isNaN(levelNum) && !isNaN(starsNum) && starsNum >= 0 && starsNum <= 3) {
-                                    this.state.bestStars[levelNum] = starsNum;
-                                }
+                                this.state.bestStars[parseInt(k)] = parseInt(v);
                             });
                         }
-                    } catch (e) {
-                        console.error('Load error:', e);
-                        this.state.maxLevel = 1;
-                        this.state.bestStars = {};
-                    }
-                } else {
-                    this.state.maxLevel = 1;
-                    this.state.bestStars = {};
+                    } catch (e) { this.state.maxLevel = 1; }
                 }
-                
                 this.calculateTotalStars();
                 this.renderLevelGrid();
             },
 
             saveProgress() {
-                // KRITIKUS FIX: Tiszta objektum létrehozása number kulcsokkal
-                const cleanBestStars = {};
-                Object.entries(this.state.bestStars).forEach(([k, v]) => {
-                    const levelNum = parseInt(k, 10);
-                    const starsNum = parseInt(v, 10);
-                    if (!isNaN(levelNum) && !isNaN(starsNum)) {
-                        cleanBestStars[levelNum] = starsNum;
-                    }
-                });
-                
-                const saveData = {
-                    maxLevel: parseInt(this.state.maxLevel),
-                    bestStars: cleanBestStars
+                const data = {
+                    maxLevel: this.state.maxLevel,
+                    bestStars: this.state.bestStars
                 };
-                
-                localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(saveData));
+                localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify(data));
             },
 
             resetProgress() {
@@ -344,77 +408,45 @@
                     localStorage.removeItem(CONFIG.SAVE_KEY);
                     this.state.maxLevel = 1;
                     this.state.bestStars = {};
-                    this.state.totalStars = 0;
-                    this.calculateTotalStars();
-                    this.renderLevelGrid();
+                    this.loadProgress();
                 }
             },
 
             calculateTotalStars() {
-                this.state.totalStars = Object.values(this.state.bestStars).reduce((acc, val) => {
-                    const num = parseInt(val, 10);
-                    return acc + (isNaN(num) ? 0 : num);
-                }, 0);
+                this.state.totalStars = Object.values(this.state.bestStars).reduce((a, b) => a + (b || 0), 0);
                 this.dom.totalStarsText.innerText = this.state.totalStars;
             },
 
             renderLevelGrid() {
+                const fragment = document.createDocumentFragment();
                 this.dom.levelGrid.innerHTML = '';
+                
                 Object.keys(LEVELS).forEach(lvlId => {
-                    const id = parseInt(lvlId, 10);
+                    const id = parseInt(lvlId);
                     const isLocked = id > this.state.maxLevel;
-                    const starCount = parseInt(this.state.bestStars[id]) || 0;
+                    const stars = this.state.bestStars[id] || 0;
                     
                     const div = document.createElement('div');
                     div.className = `level-card glass p-3 rounded-xl cursor-pointer ${isLocked ? 'locked' : 'hover:bg-white/10'}`;
                     
                     let starsHtml = '';
                     for(let i = 0; i < 3; i++) {
-                        starsHtml += `<span class="${i < starCount ? 'text-yellow-400' : 'text-white/20'}">⭐</span>`;
+                        starsHtml += `<span class="${i < stars ? 'text-yellow-400' : 'text-white/20'}">⭐</span>`;
                     }
 
                     div.innerHTML = `
                         <p class="text-[10px] font-bold text-gray-400">LVL ${id}</p>
-                        <div class="flex justify-center text-xs mt-1">
-                            ${starsHtml}
-                        </div>
+                        <div class="flex justify-center text-xs mt-1">${starsHtml}</div>
                     `;
-                    if (!isLocked) {
-                        div.onclick = () => this.requestAuth(id, true);
-                    }
-                    this.dom.levelGrid.appendChild(div);
+                    
+                    if (!isLocked) div.onclick = () => this.handleStartRequest(id, true);
+                    fragment.appendChild(div);
                 });
-            },
-
-            async requestAuth(lvl, isSingle) {
-                await requestWakeLock();
-                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    try {
-                        const res = await DeviceOrientationEvent.requestPermission();
-                        if (res === 'granted') {
-                            this.bindSensors();
-                        }
-                        this.startGame(lvl, isSingle);
-                    } catch (e) {
-                        this.startGame(lvl, isSingle);
-                    }
-                } else {
-                    this.bindSensors();
-                    this.startGame(lvl, isSingle);
-                }
-            },
-
-            bindSensors() {
-                if (this.sensorsBound) return;
-                window.addEventListener('deviceorientation', e => {
-                    currentTilt.beta = e.beta;
-                    currentTilt.gamma = e.gamma;
-                }, true);
-                this.sensorsBound = true;
+                this.dom.levelGrid.appendChild(fragment);
             },
 
             startGame(lvl, isSingle) {
-                this.state.currentLevel = parseInt(lvl, 10);
+                this.state.currentLevel = parseInt(lvl);
                 this.state.isSingleMode = isSingle;
                 this.state.active = true;
                 this.state.levelScore = 0;
@@ -431,33 +463,24 @@
                 this.generateLevel();
             },
 
-            showMenu() {
-                this.state.active = false;
-                this.dom.hud.classList.add('hidden');
-                this.dom.gameOverScreen.classList.add('hidden');
-                this.dom.levelCompleteScreen.classList.add('hidden');
-                this.dom.startScreen.classList.remove('hidden');
-                this.loadProgress();
-            },
-
             generateLevel() {
-                const w = this.canvas.width, h = this.canvas.height;
+                const { width, height } = this.state.dimensions;
                 const data = LEVELS[this.state.currentLevel];
                 this.entities.ball.reset();
 
-                const minDist = Math.min(w, h) * data.goalDistance;
+                const minDist = Math.min(width, height) * data.goalDistance;
                 let attempts = 0;
                 do {
-                    this.entities.goal.x = Math.random() * (w - 160) + 80;
-                    this.entities.goal.y = Math.random() * (h - 160) + 80;
+                    this.entities.goal.x = Math.random() * (width - 160) + 80;
+                    this.entities.goal.y = Math.random() * (height - 160) + 80;
                 } while (Math.hypot(this.entities.goal.x - this.entities.ball.x, this.entities.goal.y - this.entities.ball.y) < minDist && ++attempts < 50);
 
                 this.entities.powerup = (Math.random() < data.powerupChance) ? {
-                    x: Math.random() * (w - 100) + 50, y: Math.random() * (h - 100) + 50, active: true
+                    x: Math.random() * (width - 100) + 50, y: Math.random() * (height - 100) + 50, active: true
                 } : null;
 
                 this.entities.holes = Array.from({ length: data.holes }, () => {
-                    const hole = new Hole(w, h, this.entities.ball, this.entities.goal);
+                    const hole = new Hole(width, height, this.entities.ball, this.entities.goal);
                     if (data.holeSpeed > 0) {
                         hole.isMoving = true;
                         const angle = Math.random() * Math.PI * 2;
@@ -481,7 +504,7 @@
                 }
 
                 this.dom.timer.innerText = Math.max(0, this.state.timeLeft).toFixed(1) + 's';
-                this.dom.timerCard.style.background = this.state.timeLeft < 5 ? 'rgba(220, 38, 38, 0.4)' : '';
+                this.dom.timerCard.style.backgroundColor = this.state.timeLeft < 5 ? 'rgba(220, 38, 38, 0.4)' : '';
 
                 if (this.state.waiting) {
                     this.state.penaltyRemaining -= ds;
@@ -494,16 +517,19 @@
                     return;
                 }
 
-                this.entities.ball.update(this.state.currentLevel);
-                this.entities.holes.forEach(h => h.update());
+                this.entities.ball.update(this.state.currentLevel, this.input.tilt, this.input.keys, this.state.dimensions);
+                this.entities.holes.forEach(h => h.update(this.state.dimensions));
 
                 const { ball, goal, holes, powerup } = this.entities;
+                
+                // Goal Collision
                 if (Math.hypot(ball.x - goal.x, ball.y - goal.y) < CONFIG.ENTITIES.GOAL_RADIUS) {
                     this.state.levelScore++;
                     this.dom.score.innerText = this.state.levelScore;
                     this.generateLevel();
                 }
 
+                // Hole Collision
                 for (let h of holes) {
                     if (Math.hypot(ball.x - h.x, ball.y - h.y) < CONFIG.ENTITIES.HOLE_RADIUS - 2) {
                         this.state.waiting = true;
@@ -513,6 +539,7 @@
                     }
                 }
 
+                // Powerup Collision
                 if (powerup?.active && Math.hypot(ball.x - powerup.x, ball.y - powerup.y) < CONFIG.ENTITIES.POWERUP_RADIUS + 10) {
                     powerup.active = false;
                     this.state.timeLeft += 5;
@@ -522,7 +549,7 @@
 
             finishLevel() {
                 this.state.active = false;
-                const activeLvl = parseInt(this.state.currentLevel, 10);
+                const activeLvl = this.state.currentLevel;
                 const data = LEVELS[activeLvl];
                 const score = this.state.levelScore;
                 
@@ -531,39 +558,23 @@
                 else if (score >= data.starsThreshold[1]) stars = 2;
                 else if (score >= data.starsThreshold[0]) stars = 1;
 
-                // KRITIKUS FIX: Mindig number kulcsot használunk
-                const levelKey = parseInt(activeLvl, 10);
-                const previousBest = parseInt(this.state.bestStars[levelKey], 10) || 0;
-                
-                if (stars > previousBest) {
-                    this.state.bestStars[levelKey] = parseInt(stars, 10);
-                }
+                const prevBest = this.state.bestStars[activeLvl] || 0;
+                if (stars > prevBest) this.state.bestStars[activeLvl] = stars;
 
-                // Szint feloldás csak ha legalább 1 csillag van ÉS ez az eddigi maximum
                 if (stars >= 1 && activeLvl === this.state.maxLevel && activeLvl < Object.keys(LEVELS).length) {
                     this.state.maxLevel = activeLvl + 1;
                 }
                 
                 this.saveProgress();
-
-                document.getElementById('level-score-display').innerText = score;
-                const starSpans = document.getElementById('stars-display').querySelectorAll('span');
+                this.dom.levelScoreFinal.innerText = score;
                 
+                const starSpans = this.dom.starsDisplay.querySelectorAll('span');
                 starSpans.forEach((s, i) => {
-                    s.className = "text-5xl transition-all duration-300";
-                    if (i < stars) {
-                        s.classList.add('opacity-100', 'scale-110');
-                    } else {
-                        s.classList.add('opacity-20');
-                    }
+                    s.className = "text-5xl transition-all duration-300 " + (i < stars ? 'opacity-100 scale-110' : 'opacity-20');
                 });
 
-                const nextBtn = document.getElementById('next-level-btn');
-                if (this.state.isSingleMode || !LEVELS[activeLvl + 1]) {
-                    nextBtn.classList.add('hidden');
-                } else {
-                    nextBtn.classList.remove('hidden');
-                }
+                if (this.state.isSingleMode || !LEVELS[activeLvl + 1]) this.dom.nextLevelBtn.classList.add('hidden');
+                else this.dom.nextLevelBtn.classList.remove('hidden');
 
                 this.dom.levelCompleteScreen.classList.remove('hidden');
             },
@@ -576,16 +587,29 @@
                 setTimeout(() => t.remove(), 1500);
             },
 
+            showMenu() {
+                this.state.active = false;
+                this.dom.hud.classList.add('hidden');
+                this.dom.gameOverScreen.classList.add('hidden');
+                this.dom.levelCompleteScreen.classList.add('hidden');
+                this.dom.startScreen.classList.remove('hidden');
+                this.loadProgress();
+            },
+
             draw() {
+                const { width, height } = this.state.dimensions;
                 this.ctx.fillStyle = CONFIG.COLORS.BG;
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.fillRect(0, 0, width, height);
+                
                 if (!this.state.active && !this.state.waiting) return;
 
+                // Goal
                 this.ctx.fillStyle = CONFIG.COLORS.GOAL;
                 this.ctx.beginPath();
                 this.ctx.arc(this.entities.goal.x, this.entities.goal.y, CONFIG.ENTITIES.GOAL_RADIUS, 0, Math.PI * 2);
                 this.ctx.fill();
 
+                // Powerup
                 if (this.entities.powerup?.active) {
                     this.ctx.fillStyle = CONFIG.COLORS.POWERUP;
                     this.ctx.beginPath();
@@ -593,19 +617,23 @@
                     this.ctx.fill();
                 }
 
+                // Obstacles
                 this.entities.holes.forEach(h => h.draw(this.ctx));
+                
+                // Ball
                 this.entities.ball.draw(this.ctx, this.state.waiting);
             },
 
-            loop(t) {
-                this.update(Math.min(t - this.lastTime, 100));
+            gameLoop(t) {
+                const deltaTime = Math.min(t - this.lastTime, 100);
                 this.lastTime = t;
+                this.update(deltaTime);
                 this.draw();
-                requestAnimationFrame(time => this.loop(time));
+                requestAnimationFrame(time => this.gameLoop(time));
             }
         };
 
-        window.onload = () => Game.init();
+        window.onload = () => GameEngine.init();
     </script>
 </body>
 </html>
