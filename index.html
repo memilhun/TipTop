@@ -53,7 +53,6 @@
             <div id="start-card" class="glass-panel p-8 rounded-3xl text-center max-w-md mx-4 shadow-2xl overflow-y-auto max-h-[90vh]">
                 <h1 class="text-3xl font-bold text-white mb-4">Egyensúlyozó</h1>
                 
-                <!-- Desktop View -->
                 <div id="desktop-view" class="hidden">
                     <p class="text-gray-300 mb-4 text-sm">Ehhez a játékhoz a telefonod mozgásérzékelőjére (giroszkóp) van szükség. Asztali gépen a játék nem játszható.</p>
                     <div class="bg-white p-3 rounded-xl inline-block mb-4 shadow-xl">
@@ -63,21 +62,19 @@
                     <div class="text-[10px] text-gray-500 bg-black/20 p-2 rounded break-all select-all mt-2" id="url-display"></div>
                 </div>
 
-                <!-- Mobile View -->
                 <div id="mobile-view">
-                    <!-- Játék leírása -->
                     <div class="text-left mb-6 space-y-3">
                         <div class="p-3 bg-white/5 rounded-xl">
                             <h3 class="text-blue-400 font-bold text-sm uppercase mb-1">A cél</h3>
-                            <p class="text-gray-300 text-sm leading-relaxed">Vezesd a fehér golyót a zöld célterületre! Minden szinttel nehezebb pálya vár, több akadállyal.</p>
+                            <p class="text-gray-300 text-sm leading-relaxed">Vezesd a fehér golyót a zöld célterületre! Minden szinttel nehezebb pálya vár.</p>
                         </div>
                         <div class="p-3 bg-white/5 rounded-xl">
                             <h3 class="text-blue-400 font-bold text-sm uppercase mb-1">Hogyan játssz?</h3>
-                            <p class="text-gray-300 text-sm leading-relaxed">Döntsd a telefonodat abba az irányba, amerre a golyót gurítani szeretnéd. Minél jobban döntöd, annál gyorsabban gyorsul.</p>
+                            <p class="text-gray-300 text-sm leading-relaxed">Döntsd a telefonodat abba az irányba, amerre a golyót gurítani szeretnéd.</p>
                         </div>
                         <div class="p-3 bg-white/5 rounded-xl border border-red-500/20">
                             <h3 class="text-red-400 font-bold text-sm uppercase mb-1">Veszélyek</h3>
-                            <p class="text-gray-300 text-sm leading-relaxed">Kerüld el a fekete lyukakat! Ha beleesel, a golyó visszakerül a szint elejére.</p>
+                            <p class="text-gray-300 text-sm leading-relaxed">Kerüld el a fekete lyukakat! Ha beleesel, várakoznod kell az újraindulásig.</p>
                         </div>
                     </div>
 
@@ -90,15 +87,22 @@
                     </button>
 
                     <div id="error-msg" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
-                        A mozgásérzékelő nem küld adatot. HTTPS kapcsolat és mobil böngésző szükséges!
+                        A mozgásérzékelő nem küld adatot. HTTPS kapcsolat szükséges!
                     </div>
                 </div>
             </div>
         </div>
 
         <div id="msg-box" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div class="glass-panel px-6 py-3 rounded-full text-white font-bold text-xl animate-bounce">
+            <div id="msg-content" class="glass-panel px-8 py-4 rounded-full text-white font-bold text-2xl animate-pulse">
                 SZINT TELJESÍTVE!
+            </div>
+        </div>
+
+        <div id="countdown-box" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="flex flex-col items-center">
+                <div class="text-red-500 text-xl font-bold mb-2 uppercase tracking-widest">Újraindulás</div>
+                <div id="countdown-timer" class="text-white text-7xl font-black drop-shadow-lg">3</div>
             </div>
         </div>
     </div>
@@ -110,8 +114,8 @@
             BALL_RADIUS: 12,
             HOLE_RADIUS: 18,
             GOAL_RADIUS: 25,
-            FRICTION: 0.98,
-            ACCEL_FACTOR: 0.15,
+            BASE_FRICTION: 0.97, // Kicsit erősebb alapfékezés a kontrollért
+            BASE_ACCEL: 0.08, 
             COLORS: {
                 BALL: '#ffffff',
                 HOLE: '#000000',
@@ -122,6 +126,7 @@
 
         const state = {
             active: false,
+            waiting: false,
             level: 1,
             time: 0,
             ball: { x: 0, y: 0, vx: 0, vy: 0 },
@@ -131,7 +136,8 @@
             lastUpdate: 0,
             canvas: null,
             ctx: null,
-            receivedData: false
+            receivedData: false,
+            deathInterval: null
         };
 
         function init() {
@@ -139,7 +145,6 @@
             state.ctx = state.canvas.getContext('2d');
             resize();
             window.addEventListener('resize', resize);
-            
             detectDevice();
             
             document.getElementById('start-btn').addEventListener('click', handleStartClick);
@@ -149,12 +154,8 @@
         function detectDevice() {
             const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
             const isMobileUA = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            
-            if (!isTouch && !isMobileUA) {
-                showDesktopQR();
-            } else {
-                updateQR();
-            }
+            if (!isTouch && !isMobileUA) showDesktopQR();
+            else updateQR();
         }
 
         function showDesktopQR() {
@@ -166,69 +167,48 @@
         function updateQR() {
             let currentUrl = window.location.href;
             try {
-                if (window.self !== window.top) {
-                    currentUrl = document.referrer || window.location.href;
-                }
-            } catch (e) {
-                currentUrl = window.location.href;
-            }
-
+                if (window.self !== window.top) currentUrl = document.referrer || window.location.href;
+            } catch (e) {}
             document.getElementById('url-display').innerText = currentUrl;
-            const qrImg = document.getElementById('qr-code');
-            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentUrl)}&ecc=M`;
+            document.getElementById('qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentUrl)}&ecc=M`;
         }
 
         function resize() {
             state.canvas.width = window.innerWidth;
             state.canvas.height = window.innerHeight;
-            if (state.active) generateLevel();
+            // Átméretezéskor csak akkor generálunk új pályát, ha még nem indult el a játék, 
+            // különben játék közben elugranának a lyukak.
+            if (state.active && state.holes.length === 0) generateLevel();
         }
 
         async function handleStartClick() {
-            const errorBox = document.getElementById('error-msg');
-            const card = document.getElementById('start-card');
-
             try {
                 if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     const permission = await DeviceOrientationEvent.requestPermission();
-                    if (permission !== 'granted') throw new Error("Permission denied");
+                    if (permission !== 'granted') return;
                 }
-                
                 window.addEventListener('deviceorientation', (e) => {
                     if (e.beta !== null) state.receivedData = true;
                 }, { once: true });
-
                 startRunning();
-
-                setTimeout(() => {
-                    if (!state.receivedData && state.active) {
-                        errorBox.classList.remove('hidden');
-                        card.classList.add('error-shake');
-                    }
-                }, 2000);
-
             } catch (err) {
-                errorBox.classList.remove('hidden');
-                card.classList.add('error-shake');
+                document.getElementById('error-msg').classList.remove('hidden');
             }
         }
 
         function startRunning() {
             document.getElementById('start-screen').style.opacity = '0';
             setTimeout(() => document.getElementById('start-screen').classList.add('hidden'), 500);
-
             state.active = true;
             state.level = 1;
             state.time = 0;
             state.lastUpdate = performance.now();
-            
             window.addEventListener('deviceorientation', handleOrientation, true);
             generateLevel();
             requestAnimationFrame(gameLoop);
         }
 
         function handleOrientation(event) {
-            if (event.beta !== null) state.receivedData = true;
             state.tilt.beta = event.beta || 0;
             state.tilt.gamma = event.gamma || 0;
         }
@@ -236,45 +216,71 @@
         function generateLevel() {
             const w = state.canvas.width;
             const h = state.canvas.height;
-            state.ball.x = 50; state.ball.y = 50;
-            state.ball.vx = 0; state.ball.vy = 0;
-            state.goal.x = w - 50; state.goal.y = h - 50;
-            state.holes = [];
+            if (w === 0 || h === 0) return;
 
-            const holeCount = 5 + (state.level * 2);
+            state.ball.x = 60; 
+            state.ball.y = 60;
+            state.ball.vx = 0; 
+            state.ball.vy = 0;
+            
+            const margin = 80;
+            let attemptsGoal = 0;
+            // Célpont generálása távol a starttól
+            do {
+                state.goal.x = Math.random() * (w - margin * 2) + margin;
+                state.goal.y = Math.random() * (h - margin * 2) + margin;
+                attemptsGoal++;
+            } while (Math.hypot(state.goal.x - state.ball.x, state.goal.y - state.ball.y) < w * 0.6 && attemptsGoal < 50);
+
+            state.holes = [];
+            const holeCount = 3 + (state.level * 2);
             for (let i = 0; i < holeCount; i++) {
                 let hx, hy, attempts = 0;
                 do {
                     hx = Math.random() * (w - 60) + 30;
                     hy = Math.random() * (h - 60) + 30;
                     attempts++;
-                } while ((Math.hypot(hx - 50, hy - 50) < 80 || Math.hypot(hx - (w-50), hy - (h-50)) < 80) && attempts < 100);
+                    const safetyDist = state.level < 3 ? 120 : 70;
+                    const distToStart = Math.hypot(hx - state.ball.x, hy - state.ball.y);
+                    const distToGoal = Math.hypot(hx - state.goal.x, hy - state.goal.y);
+                    if (distToStart > 100 && distToGoal > safetyDist) break;
+                } while (attempts < 50);
                 state.holes.push({ x: hx, y: hy });
             }
             document.getElementById('level-display').innerText = state.level;
         }
 
         function update(dt) {
-            if (!state.active) return;
+            if (!state.active || state.waiting) return;
             state.time += dt / 1000;
             document.getElementById('timer-display').innerText = state.time.toFixed(1) + 's';
 
-            state.ball.vx += state.tilt.gamma * CONFIG.ACCEL_FACTOR;
-            state.ball.vy += state.tilt.beta * CONFIG.ACCEL_FACTOR;
-            state.ball.vx *= CONFIG.FRICTION;
-            state.ball.vy *= CONFIG.FRICTION;
+            // Fizikai paraméterek finomhangolása szintenként
+            const currentAccel = CONFIG.BASE_ACCEL + (state.level * 0.012);
+            const currentFriction = Math.min(0.995, CONFIG.BASE_FRICTION + (state.level * 0.001));
+
+            state.ball.vx += state.tilt.gamma * currentAccel;
+            state.ball.vy += state.tilt.beta * currentAccel;
+            state.ball.vx *= currentFriction;
+            state.ball.vy *= currentFriction;
             state.ball.x += state.ball.vx;
             state.ball.y += state.ball.vy;
 
-            if (state.ball.x < CONFIG.BALL_RADIUS) { state.ball.x = CONFIG.BALL_RADIUS; state.ball.vx *= -0.5; }
-            if (state.ball.x > state.canvas.width - CONFIG.BALL_RADIUS) { state.ball.x = state.canvas.width - CONFIG.BALL_RADIUS; state.ball.vx *= -0.5; }
-            if (state.ball.y < CONFIG.BALL_RADIUS) { state.ball.y = CONFIG.BALL_RADIUS; state.ball.vy *= -0.5; }
-            if (state.ball.y > state.canvas.height - CONFIG.BALL_RADIUS) { state.ball.y = state.canvas.height - CONFIG.BALL_RADIUS; state.ball.vy *= -0.5; }
+            // Falak
+            if (state.ball.x < CONFIG.BALL_RADIUS) { state.ball.x = CONFIG.BALL_RADIUS; state.ball.vx *= -0.4; }
+            if (state.ball.x > state.canvas.width - CONFIG.BALL_RADIUS) { state.ball.x = state.canvas.width - CONFIG.BALL_RADIUS; state.ball.vx *= -0.4; }
+            if (state.ball.y < CONFIG.BALL_RADIUS) { state.ball.y = CONFIG.BALL_RADIUS; state.ball.vy *= -0.4; }
+            if (state.ball.y > state.canvas.height - CONFIG.BALL_RADIUS) { state.ball.y = state.canvas.height - CONFIG.BALL_RADIUS; state.ball.vy *= -0.4; }
 
-            if (Math.hypot(state.ball.x - state.goal.x, state.ball.y - state.goal.y) < CONFIG.GOAL_RADIUS) nextLevel();
+            // Cél
+            if (Math.hypot(state.ball.x - state.goal.x, state.ball.y - state.goal.y) < CONFIG.GOAL_RADIUS) {
+                nextLevel();
+            }
+
+            // Lyukak
             for (let hole of state.holes) {
                 if (Math.hypot(state.ball.x - hole.x, state.ball.y - hole.y) < CONFIG.HOLE_RADIUS - 2) {
-                    resetLevel();
+                    startDeathSequence();
                     break;
                 }
             }
@@ -286,45 +292,82 @@
             generateLevel();
         }
 
-        function resetLevel() {
-            showMsg("VIGYÁZZ!");
+        function startDeathSequence() {
+            if (state.waiting) return;
+            state.waiting = true;
             state.ball.vx = 0; state.ball.vy = 0;
-            state.ball.x = 50; state.ball.y = 50;
+
+            const countdownBox = document.getElementById('countdown-box');
+            const countdownTimer = document.getElementById('countdown-timer');
+            countdownBox.classList.remove('hidden');
+
+            let timeLeft = 3;
+            countdownTimer.innerText = timeLeft;
+
+            if (state.deathInterval) clearInterval(state.deathInterval);
+            state.deathInterval = setInterval(() => {
+                timeLeft--;
+                if (timeLeft > 0) {
+                    countdownTimer.innerText = timeLeft;
+                } else {
+                    clearInterval(state.deathInterval);
+                    state.deathInterval = null;
+                    countdownBox.classList.add('hidden');
+                    resetLevel();
+                }
+            }, 1000);
+        }
+
+        function resetLevel() {
+            state.waiting = false;
+            state.ball.x = 60; state.ball.y = 60;
+            state.ball.vx = 0; state.ball.vy = 0;
+            showMsg("HAJRÁ!");
         }
 
         function showMsg(txt) {
             const box = document.getElementById('msg-box');
-            box.firstElementChild.innerText = txt;
+            const content = document.getElementById('msg-content');
+            content.innerText = txt;
             box.classList.remove('hidden');
-            setTimeout(() => box.classList.add('hidden'), 1000);
+            setTimeout(() => box.classList.add('hidden'), 1200);
         }
 
         function draw() {
             const ctx = state.ctx;
+            if (!ctx) return;
+            ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
             ctx.fillStyle = CONFIG.COLORS.BG;
             ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
 
+            // Lyukak
+            ctx.shadowBlur = 0;
             for (let hole of state.holes) {
                 ctx.fillStyle = CONFIG.COLORS.HOLE;
                 ctx.beginPath(); ctx.arc(hole.x, hole.y, CONFIG.HOLE_RADIUS, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = "rgba(255,255,255,0.05)";
+                ctx.beginPath(); ctx.arc(hole.x, hole.y, CONFIG.HOLE_RADIUS, 0, Math.PI * 2); ctx.stroke();
             }
 
+            // Célpont
             ctx.fillStyle = CONFIG.COLORS.GOAL;
-            ctx.shadowBlur = 15; ctx.shadowColor = CONFIG.COLORS.GOAL;
+            ctx.shadowBlur = 20; ctx.shadowColor = CONFIG.COLORS.GOAL;
             ctx.beginPath(); ctx.arc(state.goal.x, state.goal.y, CONFIG.GOAL_RADIUS, 0, Math.PI * 2); ctx.fill();
 
-            ctx.fillStyle = CONFIG.COLORS.BALL;
-            ctx.shadowBlur = 10; ctx.shadowColor = "white";
-            ctx.beginPath(); ctx.arc(state.ball.x, state.ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
-            
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = "rgba(255,255,255,0.8)";
-            ctx.beginPath(); ctx.arc(state.ball.x - 3, state.ball.y - 3, 3, 0, Math.PI * 2); ctx.fill();
+            // Golyó
+            if (!state.waiting || Math.floor(Date.now() / 200) % 2 === 0) { // Villogás halál után
+                ctx.fillStyle = CONFIG.COLORS.BALL;
+                ctx.shadowBlur = 15; ctx.shadowColor = "white";
+                ctx.beginPath(); ctx.arc(state.ball.x, state.ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
+                
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = "rgba(255,255,255,0.8)";
+                ctx.beginPath(); ctx.arc(state.ball.x - 3, state.ball.y - 3, 3, 0, Math.PI * 2); ctx.fill();
+            }
         }
 
         function gameLoop(timestamp) {
-            if (!state.lastUpdate) state.lastUpdate = timestamp;
-            const dt = timestamp - state.lastUpdate;
+            const dt = timestamp - (state.lastUpdate || timestamp);
             state.lastUpdate = timestamp;
             update(dt);
             draw();
