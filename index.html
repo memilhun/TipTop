@@ -75,15 +75,15 @@
                 </button>
             </div>
         </div>
+
         <div id="level-complete-screen" class="hidden absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90">
             <div class="glass p-12 rounded-[2.5rem] text-center max-w-sm mx-4">
                 <h2 class="text-2xl font-bold text-green-500 mb-4 uppercase tracking-widest">Szint teljesítve!</h2>
                 
-                <!-- Csillagok megjelenítése -->
                 <div id="stars-display" class="flex justify-center gap-3 mb-6">
-                    <span class="text-5xl opacity-30">⭐</span>
-                    <span class="text-5xl opacity-30">⭐</span>
-                    <span class="text-5xl opacity-30">⭐</span>
+                    <span class="text-5xl opacity-30 transition-all duration-300">⭐</span>
+                    <span class="text-5xl opacity-30 transition-all duration-300">⭐</span>
+                    <span class="text-5xl opacity-30 transition-all duration-300">⭐</span>
                 </div>
                 
                 <div class="mb-6">
@@ -101,6 +101,7 @@
                 </div>
             </div>
         </div>
+
         <div id="penalty-layer" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none bg-red-500/10">
             <div class="text-center">
                 <p class="text-red-500 font-black tracking-widest uppercase mb-2">Újraindulás...</p>
@@ -134,64 +135,16 @@
                 BG: '#121212'
             }
         };
+
         const LEVELS = {
-            1: {
-                name: "Bemelegítés",
-                difficulty: "easy",
-                holes: 2,
-                holeSpeed: 0,        // 0 = statikus
-                goalDistance: 0.3,    // Képernyőméret %-ában (közel)
-                powerupChance: 0.5,
-                timeLimit: 30,
-                starsThreshold: [5, 8, 12]  // 1, 2, 3 csillaghoz
-            },
-            2: {
-                name: "Gyorsulás",
-                difficulty: "easy",
-                holes: 3,
-                holeSpeed: 0,
-                goalDistance: 0.4,
-                powerupChance: 0.4,
-                timeLimit: 35,
-                starsThreshold: [6, 10, 14]
-            },
-            3: {
-                name: "Első kihívás",
-                difficulty: "medium",
-                holes: 3,
-                holeSpeed: 0.5,      // Lassan mozgó lyukak
-                goalDistance: 0.45,
-                powerupChance: 0.35,
-                timeLimit: 40,
-                starsThreshold: [8, 12, 16]
-            },
-            4: {
-                name: "Labirintus",
-                difficulty: "medium",
-                holes: 4,
-                holeSpeed: 0.8,
-                goalDistance: 0.5,
-                powerupChance: 0.3,
-                timeLimit: 45,
-                starsThreshold: [10, 15, 20]
-            },
-            5: {
-                name: "Végtelen káosz",
-                difficulty: "hard",
-                holes: 5,
-                holeSpeed: 1.5,
-                goalDistance: 0.6,
-                powerupChance: 0.25,
-                timeLimit: 60,
-                starsThreshold: [12, 18, 25]
-            }
-            // ... tovább bővíthető 20-30 szintig
+            1: { name: "Bemelegítés", difficulty: "easy", holes: 2, holeSpeed: 0, goalDistance: 0.3, powerupChance: 0.5, timeLimit: 30, starsThreshold: [5, 8, 12] },
+            2: { name: "Gyorsulás", difficulty: "easy", holes: 3, holeSpeed: 0, goalDistance: 0.4, powerupChance: 0.4, timeLimit: 35, starsThreshold: [6, 10, 14] },
+            3: { name: "Első kihívás", difficulty: "medium", holes: 3, holeSpeed: 0.5, goalDistance: 0.45, powerupChance: 0.35, timeLimit: 40, starsThreshold: [8, 12, 16] },
+            4: { name: "Labirintus", difficulty: "medium", holes: 4, holeSpeed: 0.8, goalDistance: 0.5, powerupChance: 0.3, timeLimit: 45, starsThreshold: [10, 15, 20] },
+            5: { name: "Végtelen káosz", difficulty: "hard", holes: 5, holeSpeed: 1.5, goalDistance: 0.6, powerupChance: 0.25, timeLimit: 60, starsThreshold: [12, 18, 25] }
         };
 
-        // Helper függvény: Hány szint van összesen?
         const getTotalLevels = () => Object.keys(LEVELS).length;
-
-        // Helper: Következő szint
         const getNextLevel = (currentLevel) => {
             const next = currentLevel + 1;
             return next <= getTotalLevels() ? next : null;
@@ -208,10 +161,10 @@
                 this.vy = 0;
                 this.radius = CONFIG.ENTITIES.BALL_RADIUS;
             }
-            update(tilt, score) {
-                const accel = CONFIG.PHYSICS.ACCEL_BASE + (Math.min(5, Game.state.currentLevel) * CONFIG.PHYSICS.ACCEL_INC);
-                this.vx += tilt.gamma * accel;
-                this.vy += tilt.beta * accel;
+            update(tilt, currentLevel) {
+                const accel = CONFIG.PHYSICS.ACCEL_BASE + (Math.min(5, currentLevel) * CONFIG.PHYSICS.ACCEL_INC);
+                this.vx += (tilt.gamma || 0) * accel;
+                this.vy += (tilt.beta || 0) * accel;
                 this.vx *= CONFIG.PHYSICS.FRICTION;
                 this.vy *= CONFIG.PHYSICS.FRICTION;
                 this.x += this.vx;
@@ -248,31 +201,29 @@
         }
 
         class Hole {
-            constructor(w, h, ballPos, goalPos, score) {
-                    this.radius = CONFIG.ENTITIES.HOLE_RADIUS;
-                    this.generateValidPos(w, h, ballPos, goalPos);
-                    this.isMoving = false; // Alapértelmezett, a generateLevel fogja beállítani
+            constructor(w, h, ballPos, goalPos) {
+                this.radius = CONFIG.ENTITIES.HOLE_RADIUS;
+                this.isMoving = false;
+                this.vx = 0;
+                this.vy = 0;
+                this.range = 0;
+                this.baseX = 0;
+                this.baseY = 0;
+                this.generateValidPos(w, h, ballPos, goalPos);
             }
             generateValidPos(w, h, ballPos, goalPos) {
                 let attempts = 0;
-                // Ezeket az értékeket akár a CONFIG-ba is kiveheted
                 const safeDistBall = 110; 
                 const safeDistGoal = 90;
-                const margin = 30; // Mennyire maradhasson el a szélektől
+                const margin = 40; 
 
                 do {
                     this.x = Math.random() * (w - margin * 2) + margin;
                     this.y = Math.random() * (h - margin * 2) + margin;
                     attempts++;
-                    
-                    // Kiszámoljuk a távolságokat
                     const distToBall = Math.hypot(this.x - ballPos.x, this.y - ballPos.y);
                     const distToGoal = Math.hypot(this.x - goalPos.x, this.y - goalPos.y);
-
-                    // Ha elég messze van mindkettőtől, megállunk
-                    if (distToBall >= safeDistBall && distToGoal >= safeDistGoal) {
-                        break;
-                    }
+                    if (distToBall >= safeDistBall && distToGoal >= safeDistGoal) break;
                 } while (attempts < 100); 
             }
             update() {
@@ -301,11 +252,10 @@
                 gameOver: false,
                 waiting: false,
                 penaltyRemaining: 0,
-                score: 0,
                 currentLevel: 1,
-                levelScore: 0,        // Ezen a szinten szerzett pontok
-                totalScore: 0,        // Összesített pontszám
-                starsEarned: 0,       // Aktuális szinten szerzett csillagok
+                levelScore: 0,
+                totalScore: 0,
+                starsEarned: 0,
                 timeLeft: CONFIG.GAME_DURATION,
                 tilt: { beta: 0, gamma: 0 }
             },
@@ -316,6 +266,7 @@
                 goal: { x: 0, y: 0 },
                 powerup: null
             },
+            lastTime: 0,
             
             init() {
                 this.canvas = document.getElementById('game-canvas');
@@ -330,8 +281,13 @@
                     finalScore: document.getElementById('final-score'),
                     penaltyLayer: document.getElementById('penalty-layer'),
                     penaltyTimer: document.getElementById('penalty-timer'),
-                    bonusContainer: document.getElementById('bonus-container')
+                    bonusContainer: document.getElementById('bonus-container'),
+                    levelDisplay: document.getElementById('level-display'),
+                    levelCompleteScreen: document.getElementById('level-complete-screen'),
+                    levelScoreDisplay: document.getElementById('level-score-display'),
+                    starsDisplay: document.getElementById('stars-display')
                 };
+
                 this.loadProgress();
                 this.resize();
                 window.addEventListener('resize', () => this.resize());
@@ -339,17 +295,10 @@
                 document.getElementById('start-btn').onclick = () => this.requestAuth();
                 document.getElementById('restart-btn').onclick = () => this.reset();
                 
-                requestAnimationFrame(t => this.loop(t));
-
-                this.dom.levelDisplay = document.getElementById('level-display');
-                this.dom.levelCompleteScreen = document.getElementById('level-complete-screen');
-                this.dom.levelScoreDisplay = document.getElementById('level-score-display');
-                this.dom.starsDisplay = document.getElementById('stars-display');
-                
                 document.getElementById('replay-level-btn').onclick = () => {
                     this.dom.levelCompleteScreen.classList.add('hidden');
                     this.state.active = true;
-                    this.startLevel(this.state.currentLevel); // Ugyanaz a szint újra
+                    this.startLevel(this.state.currentLevel);
                 };
                 
                 document.getElementById('next-level-btn').onclick = () => {
@@ -359,10 +308,17 @@
                         this.state.active = true;
                         this.startLevel(nextLevel);
                     } else {
-                        // Nincs több szint -> gratulálunk screen
                         alert('Gratulálunk! Teljesítetted az összes szintet!');
+                        this.state.currentLevel = 1;
+                        this.saveProgress();
+                        location.reload();
                     }
                 };
+
+                requestAnimationFrame(t => {
+                    this.lastTime = t;
+                    this.loop(t);
+                });
             },
 
             async requestAuth() {
@@ -370,7 +326,7 @@
                     if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
                         const res = await DeviceOrientationEvent.requestPermission();
                         if (res !== 'granted') {
-                            alert('A játékhoz szükség van a mozgásérzékelőre.');
+                            alert('A játékhoz mozgásérzékelő szükséges.');
                             return;
                         }
                     }
@@ -387,18 +343,12 @@
             },
 
             reset() {
-                this.state.score = 0;
-                this.state.timeLeft = CONFIG.GAME_DURATION;
+                this.state.totalScore = 0;
+                this.state.currentLevel = 1;
                 this.state.gameOver = false;
                 this.state.waiting = false;
-                this.state.penaltyRemaining = 0;
-                
-                this.dom.score.innerText = "0";
                 this.dom.gameOverScreen.classList.add('hidden');
-                this.dom.penaltyLayer.classList.add('hidden');
-                this.dom.timerCard.classList.remove('bg-red-600/40');
-                
-                this.generateLevel();
+                this.startLevel(1);
             },
 
             resize() {
@@ -409,32 +359,28 @@
             generateLevel() {
                 const w = this.canvas.width;
                 const h = this.canvas.height;
-                const levelData = LEVELS[this.state.currentLevel]; // Ezt már jól lekéred
+                const levelData = LEVELS[this.state.currentLevel];
                 
                 this.entities.ball.reset();
                 
-                // Cél távolsága
-                const minDistance = w * levelData.goalDistance;
+                const minDistance = Math.min(w, h) * levelData.goalDistance;
+                let goalAttempts = 0;
                 do {
                     this.entities.goal.x = Math.random() * (w - 160) + 80;
                     this.entities.goal.y = Math.random() * (h - 160) + 80;
+                    goalAttempts++;
                 } while (Math.hypot(this.entities.goal.x - this.entities.ball.x, 
-                                    this.entities.goal.y - this.entities.ball.y) < minDistance);
+                                    this.entities.goal.y - this.entities.ball.y) < minDistance && goalAttempts < 50);
 
-                // Power-up esély
                 this.entities.powerup = (Math.random() < levelData.powerupChance) ? {
                     x: Math.random() * (w - 160) + 80,
                     y: Math.random() * (h - 160) + 80,
                     active: true
                 } : null;
 
-                // Lyukak generálása
                 this.entities.holes = [];
                 for(let i = 0; i < levelData.holes; i++) {
-                    // A 0 helyett a tényleges szintet vagy 0-t adjunk át, 
-                    // de a lényeg, hogy a Hole konstruktora ne írja felül a mozgást!
-                    const hole = new Hole(w, h, this.entities.ball, this.entities.goal, 0); 
-                    
+                    const hole = new Hole(w, h, this.entities.ball, this.entities.goal); 
                     if (levelData.holeSpeed > 0) {
                         hole.isMoving = true;
                         const angle = Math.random() * Math.PI * 2;
@@ -443,8 +389,6 @@
                         hole.range = 50 + Math.random() * 100;
                         hole.baseX = hole.x;
                         hole.baseY = hole.y;
-                    } else {
-                        hole.isMoving = false; // Kényszerítsük statikusra, ha a szint azt kéri
                     }
                     this.entities.holes.push(hole);
                 }
@@ -453,45 +397,36 @@
             startLevel(levelNumber) {
                 this.state.currentLevel = levelNumber;
                 this.state.levelScore = 0;
-                this.state.starsEarned = 0;
-                
                 const levelData = LEVELS[levelNumber];
                 this.state.timeLeft = levelData.timeLimit;
                 
                 this.dom.levelDisplay.innerText = levelNumber;
                 this.dom.score.innerText = "0";
-                this.dom.timer.innerText = levelData.timeLimit.toFixed(1) + 's';
                 this.dom.timerCard.classList.remove('bg-red-600/40');
                 
                 this.generateLevel();
+                this.saveProgress();
             },
 
             start() {
                 this.dom.startScreen.classList.add('opacity-0');
                 setTimeout(() => this.dom.startScreen.classList.add('hidden'), 500);
                 this.state.active = true;
-                
-                window.removeEventListener('deviceorientation', this.handleOrientation.bind(this));
                 window.addEventListener('deviceorientation', this.handleOrientation.bind(this), true);
-                
-                this.startLevel(1); // Első szinttel indít
+                this.startLevel(this.state.currentLevel);
             },
 
             completeLevel() {
                 this.state.active = false;
                 const levelData = LEVELS[this.state.currentLevel];
-                
-                // Csillagok kiszámítása
                 const score = this.state.levelScore;
+                
                 let stars = 0;
                 if (score >= levelData.starsThreshold[2]) stars = 3;
                 else if (score >= levelData.starsThreshold[1]) stars = 2;
                 else if (score >= levelData.starsThreshold[0]) stars = 1;
                 
-                this.state.starsEarned = stars;
                 this.state.totalScore += score;
-                
-                // UI frissítés
                 this.dom.levelScoreDisplay.innerText = score;
                 this.showStars(stars);
                 this.dom.levelCompleteScreen.classList.remove('hidden');
@@ -500,27 +435,23 @@
             showStars(count) {
                 const starElements = this.dom.starsDisplay.querySelectorAll('span');
                 starElements.forEach((star, i) => {
+                    star.classList.remove('opacity-100', 'scale-125');
+                    star.classList.add('opacity-30');
                     if (i < count) {
-                        star.classList.remove('opacity-30');
-                        star.classList.add('opacity-100');
-                        // Animáció késleltetéssel
                         setTimeout(() => {
-                            star.style.transform = 'scale(1.3)';
-                            setTimeout(() => star.style.transform = 'scale(1)', 200);
+                            star.classList.remove('opacity-30');
+                            star.classList.add('opacity-100', 'scale-125');
+                            setTimeout(() => star.classList.remove('scale-125'), 200);
                         }, i * 300);
-                    } else {
-                        star.classList.add('opacity-30');
-                        star.classList.remove('opacity-100');
                     }
                 });
             },
 
             triggerPenalty() {
-                if (this.state.waiting || this.state.gameOver) return;
+                if (this.state.waiting || !this.state.active) return;
                 this.state.waiting = true;
                 this.state.penaltyRemaining = 3;
                 this.dom.penaltyLayer.classList.remove('hidden');
-                this.dom.penaltyTimer.innerText = "3";
             },
 
             showBonusToast() {
@@ -540,13 +471,11 @@
                 if (this.state.timeLeft <= 0) {
                     this.state.timeLeft = 0;
                     this.completeLevel();
-                return;
+                    return;
                 }
 
                 this.dom.timer.innerText = this.state.timeLeft.toFixed(1) + 's';
-                if (this.state.timeLeft < 10) {
-                    this.dom.timerCard.classList.add('bg-red-600/40');
-                }
+                if (this.state.timeLeft < 10) this.dom.timerCard.classList.add('bg-red-600/40');
 
                 if (this.state.waiting) {
                     this.state.penaltyRemaining -= dtSec;
@@ -559,15 +488,15 @@
                     return;
                 }
 
-                this.entities.ball.update(this.state.tilt, this.state.score);
+                this.entities.ball.update(this.state.tilt, this.state.currentLevel);
                 this.entities.holes.forEach(h => h.update());
 
                 const ball = this.entities.ball;
                 const goal = this.entities.goal;
                 if (Math.hypot(ball.x - goal.x, ball.y - goal.y) < CONFIG.ENTITIES.GOAL_RADIUS) {
-                    this.state.levelScore++;  // ÚJ: levelScore növelése
+                    this.state.levelScore++;
                     this.dom.score.innerText = this.state.levelScore;
-                    this.generateLevel();  // Új célpont ugyanazon a szinten
+                    this.generateLevel();
                 }
 
                 for (let h of this.entities.holes) {
@@ -605,12 +534,10 @@
                     this.ctx.beginPath();
                     this.ctx.arc(p.x, p.y, CONFIG.ENTITIES.POWERUP_RADIUS, 0, Math.PI * 2);
                     this.ctx.fill();
-                    this.ctx.shadowBlur = 0;
                     this.ctx.fillStyle = '#000000';
-                    this.ctx.font = 'bold 14px sans-serif';
+                    this.ctx.font = 'bold 12px sans-serif';
                     this.ctx.textAlign = 'center';
-                    this.ctx.textBaseline = 'middle';
-                    this.ctx.fillText('+5s', p.x, p.y);
+                    this.ctx.fillText('+5s', p.x, p.y + 4);
                     this.ctx.restore();
                 }
 
@@ -619,10 +546,8 @@
             },
 
             loop(t) {
-                const dt = t - (this.lastTime || t);
+                const dt = t - this.lastTime;
                 this.lastTime = t;
-                
-                // Limit dt to avoid huge jumps after tab-switching
                 this.update(Math.min(dt, 100));
                 this.draw();
                 requestAnimationFrame(time => this.loop(time));
@@ -631,9 +556,7 @@
             saveProgress() {
                 const progress = {
                     currentLevel: this.state.currentLevel,
-                    totalScore: this.state.totalScore,
-                    levelsCompleted: this.state.currentLevel - 1,
-                    // Később: csillagok szintenként
+                    totalScore: this.state.totalScore
                 };
                 localStorage.setItem('tiptop_progress', JSON.stringify(progress));
             },
@@ -645,7 +568,7 @@
                     this.state.currentLevel = progress.currentLevel || 1;
                     this.state.totalScore = progress.totalScore || 0;
                 }
-            },
+            }
         };
 
         window.onload = () => Game.init();
