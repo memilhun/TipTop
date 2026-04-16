@@ -177,7 +177,7 @@
                 
                 // iOS Fix: Ensure tilt values are processed correctly
                 let ax = (tilt.gamma || 0) * accel;
-                let ay = (tilt.beta || 0) * accel;
+                let ay = -(tilt.beta || 0) * accel;
 
                 if (keys['ArrowLeft'] || keys['a']) ax -= accel * 10;
                 if (keys['ArrowRight'] || keys['d']) ax += accel * 10;
@@ -367,13 +367,23 @@
             },
 
             bindSensors() {
-                // Csak egyszer iratkozzunk fel
-                if (this.sensorsBound) return;
-                window.addEventListener('deviceorientation', e => {
-                    currentTilt.beta = e.beta;
-                    currentTilt.gamma = e.gamma;
-                }, true);
-                this.sensorsBound = true;
+                if (this.input.sensorsBound) return;
+                
+                const onOrientation = (e) => {
+                    // Calibrate on first valid data
+                    if (this.input.tilt.initialBeta === null && e.beta !== null) {
+                        this.input.tilt.initialBeta = e.beta;
+                        this.input.tilt.initialGamma = e.gamma;
+                    }
+
+                    // Process and normalize values
+                    // Landscape handling could be added here if needed
+                    this.input.tilt.beta = e.beta - (this.input.tilt.initialBeta || e.beta);
+                    this.input.tilt.gamma = e.gamma - (this.input.tilt.initialGamma || e.gamma);
+                };
+
+                window.addEventListener('deviceorientation', onOrientation, true);
+                this.input.sensorsBound = true;
             },
 
             loadProgress() {
