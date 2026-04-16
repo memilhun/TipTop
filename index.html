@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TipTop - v2.0</title>
+    <title>TipTop - v2.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -125,11 +125,13 @@
     <canvas id="game-canvas"></canvas>
 
     <script>
+        // CONFIGURATION ISOLATION
         const CONFIG = {
             GAME_DURATION: 90,
             PHYSICS: { FRICTION: 0.97, ACCEL_BASE: 0.08, ACCEL_INC: 0.005, BOUNCE: -0.5 },
             ENTITIES: { BALL_RADIUS: 12, HOLE_RADIUS: 18, GOAL_RADIUS: 25, POWERUP_RADIUS: 20 },
-            COLORS: { BALL: '#ffffff', HOLE: '#f55742', GOAL: '#22c55e', POWERUP: '#fbbf24', BG: '#0a0a0a' }
+            COLORS: { BALL: '#ffffff', HOLE: '#f55742', GOAL: '#22c55e', POWERUP: '#fbbf24', BG: '#0a0a0a' },
+            SAVE_KEY: 'tiptop_v3_save'
         };
 
         const LEVELS = {
@@ -146,7 +148,6 @@
         
         // ÁLLAPOTKEZELÉS
         let wakeLock = null;
-        
         const currentTilt = { beta: 0, gamma: 0 };
         const keys = {};
 
@@ -227,10 +228,11 @@
                 active: false,
                 waiting: false,
                 currentLevel: 1,
+                maxLevel: 1,
                 isSingleMode: false,
                 levelScore: 0,
                 totalStars: 0,
-                bestStars: {}, // levelIndex: starCount
+                bestStars: {}, 
                 timeLeft: 0,
                 penaltyRemaining: 0
             },
@@ -264,7 +266,7 @@
                 window.addEventListener('keydown', e => keys[e.key] = true);
                 window.addEventListener('keyup', e => keys[e.key] = false);
 
-                document.getElementById('quick-start-btn').onclick = () => this.requestAuth(this.state.currentLevel, false);
+                document.getElementById('quick-start-btn').onclick = () => this.requestAuth(this.state.maxLevel, false);
                 document.getElementById('restart-btn').onclick = () => this.showMenu();
                 document.getElementById('back-to-menu-btn').onclick = () => this.showMenu();
                 document.getElementById('next-level-btn').onclick = () => {
@@ -282,18 +284,18 @@
             },
 
             loadProgress() {
-                const saved = localStorage.getItem('tiptop_v3_save');
+                const saved = localStorage.getItem(CONFIG.SAVE_KEY);
                 if (saved) {
                     const data = JSON.parse(saved);
-                    this.state.currentLevel = data.maxLevel || 1;
+                    this.state.maxLevel = data.maxLevel || 1;
                     this.state.bestStars = data.bestStars || {};
                 }
                 this.calculateTotalStars();
             },
 
             saveProgress() {
-                localStorage.setItem('tiptop_v3_save', JSON.stringify({
-                    maxLevel: this.state.currentLevel,
+                localStorage.setItem(CONFIG.SAVE_KEY, JSON.stringify({
+                    maxLevel: this.state.maxLevel,
                     bestStars: this.state.bestStars
                 }));
             },
@@ -307,7 +309,7 @@
                 this.dom.levelGrid.innerHTML = '';
                 Object.keys(LEVELS).forEach(lvlId => {
                     const id = parseInt(lvlId);
-                    const isLocked = id > this.state.currentLevel;
+                    const isLocked = id > this.state.maxLevel;
                     const starCount = this.state.bestStars[id] || 0;
                     
                     const div = document.createElement('div');
@@ -454,22 +456,22 @@
 
             finishLevel() {
                 this.state.active = false;
-                const data = LEVELS[this.state.currentLevel];
+                const activeLvl = this.state.currentLevel;
+                const data = LEVELS[activeLvl];
                 let stars = 0;
+                
                 if (this.state.levelScore >= data.starsThreshold[2]) stars = 3;
                 else if (this.state.levelScore >= data.starsThreshold[1]) stars = 2;
                 else if (this.state.levelScore >= data.starsThreshold[0]) stars = 1;
 
-                // Mentés, ha jobb az eredmény
-                if (!this.state.bestStars[this.state.currentLevel] || stars > this.state.bestStars[this.state.currentLevel]) {
-                    this.state.bestStars[this.state.currentLevel] = stars;
+                // Mentés logikájának javítása: az aktuális szint (activeLvl) adatait frissítjük
+                if (!this.state.bestStars[activeLvl] || stars > this.state.bestStars[activeLvl]) {
+                    this.state.bestStars[activeLvl] = stars;
                 }
 
-                // Feloldás, ha legalább 1 csillag van
-                if (stars >= 1 && this.state.currentLevel < Object.keys(LEVELS).length) {
-                    if (this.state.currentLevel + 1 > (localStorage.getItem('maxLvl') || 1)) {
-                        this.state.currentLevel++; 
-                    }
+                // Szintfeloldás: ha legalább 1 csillag van és az utolsó feloldott szintet játszotta
+                if (stars >= 1 && activeLvl === this.state.maxLevel && activeLvl < Object.keys(LEVELS).length) {
+                    this.state.maxLevel = activeLvl + 1;
                 }
                 
                 this.saveProgress();
@@ -480,7 +482,6 @@
                     s.className = `text-5xl transition-all duration-300 ${i < stars ? 'opacity-100 scale-110' : 'opacity-20'}`;
                 });
 
-                // Ha Single Mode volt, ne engedjük a tovább gombot
                 const nextBtn = document.getElementById('next-level-btn');
                 if (this.state.isSingleMode) {
                     nextBtn.classList.add('hidden');
