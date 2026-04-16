@@ -60,6 +60,7 @@
                     Egyensúlyozz a golyóval a zöld célpontig! <br>
                     <span class="text-blue-400 font-medium">Döntsd a telefonod az irányításhoz.</span>
                 </p>
+                <p id="save-info" class="text-blue-300 text-xs font-bold mb-4 uppercase tracking-widest hidden">Legutóbbi mentés: Level 1 - 0 pont</p>
                 <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-900/40 transition-transform active:scale-95">
                     JÁTÉK INDÍTÁSA
                 </button>
@@ -305,6 +306,7 @@
                     levelDisplay: document.getElementById('level-display'),
                     levelCompleteScreen: document.getElementById('level-complete-screen'),
                     levelScoreDisplay: document.getElementById('level-score-display'),
+                    saveInfo: document.getElementById('save-info'),
                     starsDisplay: document.getElementById('stars-display')
                 };
 
@@ -590,6 +592,11 @@
                     totalScore: this.state.totalScore
                 };
                 localStorage.setItem('tiptop_progress', JSON.stringify(progress));
+                
+                // Frissítjük a start screen feliratát is azonnal
+                if (this.dom.saveInfo) {
+                    this.dom.saveInfo.innerText = `Legutóbbi mentés: Level ${this.state.currentLevel} - ${this.state.totalScore} pont`;
+                }
             },
 
             loadProgress() {
@@ -598,8 +605,14 @@
                     const progress = JSON.parse(saved);
                     this.state.currentLevel = progress.currentLevel || 1;
                     this.state.totalScore = progress.totalScore || 0;
+                    
+                    // UI frissítése a betöltött adatokkal
+                    if (this.dom.saveInfo) {
+                        this.dom.saveInfo.innerText = `Legutóbbi mentés: Level ${this.state.currentLevel} - ${this.state.totalScore} pont`;
+                        this.dom.saveInfo.classList.remove('hidden');
+                    }
                 }
-            }
+            },
         };
 
         window.onload = () => Game.init();
