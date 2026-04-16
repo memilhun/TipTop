@@ -12,11 +12,14 @@
             touch-action: none;
             background-color: #121212;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-user-select: none;
+            user-select: none;
         }
         #game-canvas { display: block; }
         .glass {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
         @keyframes fade-up {
@@ -32,7 +35,6 @@
 </head>
 <body>
 
-    <!-- UI Overlay -->
     <div id="ui" class="fixed inset-0 pointer-events-none flex flex-col justify-between p-6 z-10">
         <div class="flex justify-between items-start pointer-events-auto">
             <div class="glass text-white px-5 py-3 rounded-2xl">
@@ -40,10 +42,7 @@
                 <p id="score-display" class="text-3xl font-black">0</p>
             </div>
             
-            <!-- Bonus Notification Area -->
-            <div id="bonus-container" class="flex-1 flex justify-center pt-2">
-                <!-- Dinamikusan ide kerülnek a bónusz üzenetek -->
-            </div>
+            <div id="bonus-container" class="flex-1 flex justify-center pt-2"></div>
 
             <div id="timer-card" class="glass text-white px-5 py-3 rounded-2xl text-right transition-all">
                 <p class="text-[10px] uppercase tracking-widest opacity-50 font-bold">Idő</p>
@@ -51,7 +50,6 @@
             </div>
         </div>
 
-        <!-- Start Screen -->
         <div id="start-screen" class="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/60 transition-opacity duration-500">
             <div class="glass p-10 rounded-[2rem] text-center max-w-sm mx-4 shadow-2xl">
                 <h1 class="text-5xl font-extrabold text-white mb-6 tracking-tighter">TipTop</h1>
@@ -65,7 +63,6 @@
             </div>
         </div>
 
-        <!-- Game Over Screen -->
         <div id="game-over-screen" class="hidden absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/90">
             <div class="glass p-12 rounded-[2.5rem] text-center max-w-sm mx-4 border-red-500/20">
                 <h2 class="text-2xl font-bold text-red-500 mb-2 uppercase tracking-widest">Idő lejárt</h2>
@@ -76,7 +73,6 @@
             </div>
         </div>
 
-        <!-- Penalty Countdown -->
         <div id="penalty-layer" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none bg-red-500/10">
             <div class="text-center">
                 <p class="text-red-500 font-black tracking-widest uppercase mb-2">Újraindulás...</p>
@@ -88,9 +84,6 @@
     <canvas id="game-canvas"></canvas>
 
     <script>
-        /**
-         * CONFIGURATION
-         */
         const CONFIG = {
             GAME_DURATION: 90,
             PHYSICS: {
@@ -103,7 +96,7 @@
                 BALL_RADIUS: 12,
                 HOLE_RADIUS: 18,
                 GOAL_RADIUS: 25,
-                POWERUP_RADIUS: 20 // Slightly larger to fit text
+                POWERUP_RADIUS: 20
             },
             COLORS: {
                 BALL: '#ffffff',
@@ -114,9 +107,6 @@
             }
         };
 
-        /**
-         * ENTITY CLASSES
-         */
         class Ball {
             constructor() {
                 this.reset();
@@ -139,13 +129,19 @@
                 this.handleBounds();
             }
             handleBounds() {
-                if (this.x < this.radius || this.x > window.innerWidth - this.radius) {
+                if (this.x < this.radius) {
                     this.vx *= CONFIG.PHYSICS.BOUNCE;
-                    this.x = this.x < this.radius ? this.radius : window.innerWidth - this.radius;
+                    this.x = this.radius;
+                } else if (this.x > window.innerWidth - this.radius) {
+                    this.vx *= CONFIG.PHYSICS.BOUNCE;
+                    this.x = window.innerWidth - this.radius;
                 }
-                if (this.y < this.radius || this.y > window.innerHeight - this.radius) {
+                if (this.y < this.radius) {
                     this.vy *= CONFIG.PHYSICS.BOUNCE;
-                    this.y = this.y < this.radius ? this.radius : window.innerHeight - this.radius;
+                    this.y = this.radius;
+                } else if (this.y > window.innerHeight - this.radius) {
+                    this.vy *= CONFIG.PHYSICS.BOUNCE;
+                    this.y = window.innerHeight - this.radius;
                 }
             }
             draw(ctx, isWaiting) {
@@ -164,9 +160,7 @@
         class Hole {
             constructor(w, h, ballPos, goalPos, score) {
                 this.radius = CONFIG.ENTITIES.HOLE_RADIUS;
-                this.scoreAtSpawn = score;
                 this.generateValidPos(w, h, ballPos, goalPos);
-                
                 this.isMoving = score > 5;
                 if (this.isMoving) {
                     const speed = Math.random() * 2 + 1;
@@ -180,14 +174,16 @@
             }
             generateValidPos(w, h, ballPos, goalPos) {
                 let attempts = 0;
+                const safeDistBall = 110;
+                const safeDistGoal = 90;
                 do {
                     this.x = Math.random() * (w - 60) + 30;
                     this.y = Math.random() * (h - 60) + 30;
                     attempts++;
                 } while (
                     attempts < 100 && (
-                        Math.hypot(this.x - ballPos.x, this.y - ballPos.y) < 110 ||
-                        Math.hypot(this.x - goalPos.x, this.y - goalPos.y) < 90
+                        Math.hypot(this.x - ballPos.x, this.y - ballPos.y) < safeDistBall ||
+                        Math.hypot(this.x - goalPos.x, this.y - goalPos.y) < safeDistGoal
                     )
                 );
             }
@@ -211,18 +207,17 @@
             }
         }
 
-        /**
-         * GAME ENGINE
-         */
         const Game = {
             state: {
                 active: false,
                 gameOver: false,
                 waiting: false,
+                penaltyRemaining: 0,
                 score: 0,
                 timeLeft: CONFIG.GAME_DURATION,
                 tilt: { beta: 0, gamma: 0 }
             },
+            dom: {},
             entities: {
                 ball: new Ball(),
                 holes: [],
@@ -233,31 +228,57 @@
             init() {
                 this.canvas = document.getElementById('game-canvas');
                 this.ctx = this.canvas.getContext('2d');
+                
+                this.dom = {
+                    score: document.getElementById('score-display'),
+                    timer: document.getElementById('timer-display'),
+                    timerCard: document.getElementById('timer-card'),
+                    startScreen: document.getElementById('start-screen'),
+                    gameOverScreen: document.getElementById('game-over-screen'),
+                    finalScore: document.getElementById('final-score'),
+                    penaltyLayer: document.getElementById('penalty-layer'),
+                    penaltyTimer: document.getElementById('penalty-timer'),
+                    bonusContainer: document.getElementById('bonus-container')
+                };
+
                 this.resize();
                 window.addEventListener('resize', () => this.resize());
                 
                 document.getElementById('start-btn').onclick = () => this.requestAuth();
                 document.getElementById('restart-btn').onclick = () => this.reset();
                 
-                this.loop();
+                requestAnimationFrame(t => this.loop(t));
             },
 
             async requestAuth() {
-                if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    const res = await DeviceOrientationEvent.requestPermission();
-                    if (res !== 'granted') return;
+                try {
+                    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                        const res = await DeviceOrientationEvent.requestPermission();
+                        if (res !== 'granted') {
+                            alert('A játékhoz szükség van a mozgásérzékelőre.');
+                            return;
+                        }
+                    }
+                    this.start();
+                } catch (e) {
+                    console.error("Auth error:", e);
+                    this.start(); 
                 }
-                this.start();
+            },
+
+            handleOrientation(e) {
+                this.state.tilt.beta = e.beta || 0;
+                this.state.tilt.gamma = e.gamma || 0;
             },
 
             start() {
-                document.getElementById('start-screen').classList.add('opacity-0');
-                setTimeout(() => document.getElementById('start-screen').classList.add('hidden'), 500);
+                this.dom.startScreen.classList.add('opacity-0');
+                setTimeout(() => this.dom.startScreen.classList.add('hidden'), 500);
                 this.state.active = true;
-                window.addEventListener('deviceorientation', e => {
-                    this.state.tilt.beta = e.beta || 0;
-                    this.state.tilt.gamma = e.gamma || 0;
-                }, true);
+                
+                window.removeEventListener('deviceorientation', this.handleOrientation.bind(this));
+                window.addEventListener('deviceorientation', this.handleOrientation.bind(this), true);
+                
                 this.generateLevel();
             },
 
@@ -266,8 +287,13 @@
                 this.state.timeLeft = CONFIG.GAME_DURATION;
                 this.state.gameOver = false;
                 this.state.waiting = false;
-                document.getElementById('score-display').innerText = "0";
-                document.getElementById('game-over-screen').classList.add('hidden');
+                this.state.penaltyRemaining = 0;
+                
+                this.dom.score.innerText = "0";
+                this.dom.gameOverScreen.classList.add('hidden');
+                this.dom.penaltyLayer.classList.add('hidden');
+                this.dom.timerCard.classList.remove('bg-red-600/40');
+                
                 this.generateLevel();
             },
 
@@ -277,23 +303,21 @@
             },
 
             generateLevel() {
-                const w = this.canvas.width, h = this.canvas.height;
+                const w = this.canvas.width;
+                const h = this.canvas.height;
                 this.entities.ball.reset();
                 
-                // Goal
                 do {
                     this.entities.goal.x = Math.random() * (w - 160) + 80;
                     this.entities.goal.y = Math.random() * (h - 160) + 80;
                 } while (Math.hypot(this.entities.goal.x - this.entities.ball.x, this.entities.goal.y - this.entities.ball.y) < w * 0.4);
 
-                // Powerup (+5s indicator)
                 this.entities.powerup = (Math.random() < 0.35) ? {
                     x: Math.random() * (w - 160) + 80,
                     y: Math.random() * (h - 160) + 80,
                     active: true
                 } : null;
 
-                // Holes
                 this.entities.holes = [];
                 const count = 3 + Math.floor(this.state.score / 2);
                 for(let i=0; i<count; i++) {
@@ -304,74 +328,69 @@
             triggerPenalty() {
                 if (this.state.waiting || this.state.gameOver) return;
                 this.state.waiting = true;
-                const layer = document.getElementById('penalty-layer');
-                const timer = document.getElementById('penalty-timer');
-                layer.classList.remove('hidden');
-                
-                let count = 3;
-                timer.innerText = count;
-                const itv = setInterval(() => {
-                    count--;
-                    if (count > 0) timer.innerText = count;
-                    else {
-                        clearInterval(itv);
-                        layer.classList.add('hidden');
-                        this.state.waiting = false;
-                        this.entities.ball.reset();
-                    }
-                }, 1000);
+                this.state.penaltyRemaining = 3;
+                this.dom.penaltyLayer.classList.remove('hidden');
+                this.dom.penaltyTimer.innerText = "3";
             },
 
             showBonusToast() {
-                const container = document.getElementById('bonus-container');
                 const toast = document.createElement('div');
                 toast.className = 'glass px-4 py-1 rounded-full text-yellow-400 font-bold text-sm bonus-anim flex items-center shadow-lg border-yellow-500/30';
                 toast.innerHTML = `<span class="mr-1">⚡</span> IDŐ BÓNUSZ +5s`;
-                container.appendChild(toast);
+                this.dom.bonusContainer.appendChild(toast);
                 setTimeout(() => toast.remove(), 1600);
             },
 
             update(dt) {
                 if (!this.state.active || this.state.gameOver) return;
 
-                // Timer runs even during penalty
-                this.state.timeLeft -= dt / 1000;
+                const dtSec = dt / 1000;
+                this.state.timeLeft -= dtSec;
+
                 if (this.state.timeLeft <= 0) {
                     this.state.timeLeft = 0;
                     this.state.gameOver = true;
-                    document.getElementById('final-score').innerText = this.state.score;
-                    document.getElementById('game-over-screen').classList.remove('hidden');
+                    this.dom.finalScore.innerText = this.state.score;
+                    this.dom.gameOverScreen.classList.remove('hidden');
                     return;
                 }
 
-                document.getElementById('timer-display').innerText = this.state.timeLeft.toFixed(1) + 's';
-                if (this.state.timeLeft < 10) document.getElementById('timer-card').classList.add('bg-red-600/40');
-                else document.getElementById('timer-card').classList.remove('bg-red-600/40');
+                this.dom.timer.innerText = this.state.timeLeft.toFixed(1) + 's';
+                if (this.state.timeLeft < 10) {
+                    this.dom.timerCard.classList.add('bg-red-600/40');
+                }
 
-                if (this.state.waiting) return;
+                if (this.state.waiting) {
+                    this.state.penaltyRemaining -= dtSec;
+                    this.dom.penaltyTimer.innerText = Math.ceil(this.state.penaltyRemaining);
+                    if (this.state.penaltyRemaining <= 0) {
+                        this.state.waiting = false;
+                        this.dom.penaltyLayer.classList.add('hidden');
+                        this.entities.ball.reset();
+                    }
+                    return;
+                }
 
-                // Entities update
                 this.entities.ball.update(this.state.tilt, this.state.score);
                 this.entities.holes.forEach(h => h.update());
 
-                // Collisions: Goal
-                if (Math.hypot(this.entities.ball.x - this.entities.goal.x, this.entities.ball.y - this.entities.goal.y) < CONFIG.ENTITIES.GOAL_RADIUS) {
+                const ball = this.entities.ball;
+                const goal = this.entities.goal;
+                if (Math.hypot(ball.x - goal.x, ball.y - goal.y) < CONFIG.ENTITIES.GOAL_RADIUS) {
                     this.state.score++;
-                    document.getElementById('score-display').innerText = this.state.score;
+                    this.dom.score.innerText = this.state.score;
                     this.generateLevel();
                 }
 
-                // Collisions: Holes
                 for (let h of this.entities.holes) {
-                    if (Math.hypot(this.entities.ball.x - h.x, this.entities.ball.y - h.y) < CONFIG.ENTITIES.HOLE_RADIUS - 2) {
+                    if (Math.hypot(ball.x - h.x, ball.y - h.y) < CONFIG.ENTITIES.HOLE_RADIUS - 2) {
                         this.triggerPenalty();
                         break;
                     }
                 }
                 
-                // Collisions: Powerup (+5s)
                 const p = this.entities.powerup;
-                if (p && p.active && Math.hypot(this.entities.ball.x - p.x, this.entities.ball.y - p.y) < CONFIG.ENTITIES.POWERUP_RADIUS + 10) {
+                if (p && p.active && Math.hypot(ball.x - p.x, ball.y - p.y) < CONFIG.ENTITIES.POWERUP_RADIUS + 10) {
                     p.active = false;
                     this.state.timeLeft += 5;
                     this.showBonusToast();
@@ -384,51 +403,41 @@
 
                 if (!this.state.active) return;
 
-                // Goal
                 this.ctx.fillStyle = CONFIG.COLORS.GOAL;
                 this.ctx.beginPath();
                 this.ctx.arc(this.entities.goal.x, this.entities.goal.y, CONFIG.ENTITIES.GOAL_RADIUS, 0, Math.PI * 2);
                 this.ctx.fill();
 
-                // Powerup (+5s label icon)
                 if (this.entities.powerup?.active) {
                     const p = this.entities.powerup;
                     this.ctx.save();
-                    
-                    // Glow effect
                     this.ctx.shadowBlur = 15;
                     this.ctx.shadowColor = CONFIG.COLORS.POWERUP;
-                    
-                    // Circular background
                     this.ctx.fillStyle = CONFIG.COLORS.POWERUP;
                     this.ctx.beginPath();
                     this.ctx.arc(p.x, p.y, CONFIG.ENTITIES.POWERUP_RADIUS, 0, Math.PI * 2);
                     this.ctx.fill();
-                    
-                    // Text label inside
                     this.ctx.shadowBlur = 0;
                     this.ctx.fillStyle = '#000000';
                     this.ctx.font = 'bold 14px sans-serif';
                     this.ctx.textAlign = 'center';
                     this.ctx.textBaseline = 'middle';
                     this.ctx.fillText('+5s', p.x, p.y);
-                    
                     this.ctx.restore();
                 }
 
-                // Holes
                 this.entities.holes.forEach(h => h.draw(this.ctx));
-
-                // Ball
                 this.entities.ball.draw(this.ctx, this.state.waiting);
             },
 
             loop(t) {
                 const dt = t - (this.lastTime || t);
                 this.lastTime = t;
-                this.update(dt);
+                
+                // Limit dt to avoid huge jumps after tab-switching
+                this.update(Math.min(dt, 100));
                 this.draw();
-                requestAnimationFrame(t => this.loop(t));
+                requestAnimationFrame(time => this.loop(time));
             }
         };
 
