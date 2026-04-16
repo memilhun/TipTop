@@ -209,7 +209,7 @@
                 this.radius = CONFIG.ENTITIES.BALL_RADIUS;
             }
             update(tilt, score) {
-                const accel = CONFIG.PHYSICS.ACCEL_BASE + (Math.min(10, score) * CONFIG.PHYSICS.ACCEL_INC);
+                const accel = CONFIG.PHYSICS.ACCEL_BASE + (Math.min(5, Game.state.currentLevel) * CONFIG.PHYSICS.ACCEL_INC);
                 this.vx += tilt.gamma * accel;
                 this.vy += tilt.beta * accel;
                 this.vx *= CONFIG.PHYSICS.FRICTION;
@@ -249,33 +249,31 @@
 
         class Hole {
             constructor(w, h, ballPos, goalPos, score) {
-                this.radius = CONFIG.ENTITIES.HOLE_RADIUS;
-                this.generateValidPos(w, h, ballPos, goalPos);
-                this.isMoving = score > 5;
-                if (this.isMoving) {
-                    const speed = Math.random() * 2 + 1;
-                    const angle = Math.random() * Math.PI * 2;
-                    this.vx = Math.cos(angle) * speed;
-                    this.vy = Math.sin(angle) * speed;
-                    this.range = 50 + Math.random() * 100;
-                    this.baseX = this.x;
-                    this.baseY = this.y;
-                }
+                    this.radius = CONFIG.ENTITIES.HOLE_RADIUS;
+                    this.generateValidPos(w, h, ballPos, goalPos);
+                    this.isMoving = false; // Alapértelmezett, a generateLevel fogja beállítani
             }
             generateValidPos(w, h, ballPos, goalPos) {
                 let attempts = 0;
-                const safeDistBall = 110;
+                // Ezeket az értékeket akár a CONFIG-ba is kiveheted
+                const safeDistBall = 110; 
                 const safeDistGoal = 90;
+                const margin = 30; // Mennyire maradhasson el a szélektől
+
                 do {
-                    this.x = Math.random() * (w - 60) + 30;
-                    this.y = Math.random() * (h - 60) + 30;
+                    this.x = Math.random() * (w - margin * 2) + margin;
+                    this.y = Math.random() * (h - margin * 2) + margin;
                     attempts++;
-                } while (
-                    attempts < 100 && (
-                        Math.hypot(this.x - ballPos.x, this.y - ballPos.y) < safeDistBall ||
-                        Math.hypot(this.x - goalPos.x, this.y - goalPos.y) < safeDistGoal
-                    )
-                );
+                    
+                    // Kiszámoljuk a távolságokat
+                    const distToBall = Math.hypot(this.x - ballPos.x, this.y - ballPos.y);
+                    const distToGoal = Math.hypot(this.x - goalPos.x, this.y - goalPos.y);
+
+                    // Ha elég messze van mindkettőtől, megállunk
+                    if (distToBall >= safeDistBall && distToGoal >= safeDistGoal) {
+                        break;
+                    }
+                } while (attempts < 100); 
             }
             update() {
                 if (!this.isMoving) return;
@@ -388,17 +386,6 @@
                 this.state.tilt.gamma = e.gamma || 0;
             },
 
-            start() {
-                this.dom.startScreen.classList.add('opacity-0');
-                setTimeout(() => this.dom.startScreen.classList.add('hidden'), 500);
-                this.state.active = true;
-                
-                window.removeEventListener('deviceorientation', this.handleOrientation.bind(this));
-                window.addEventListener('deviceorientation', this.handleOrientation.bind(this), true);
-                
-                this.generateLevel();
-            },
-
             reset() {
                 this.state.score = 0;
                 this.state.timeLeft = CONFIG.GAME_DURATION;
@@ -422,32 +409,32 @@
             generateLevel() {
                 const w = this.canvas.width;
                 const h = this.canvas.height;
-                const levelData = LEVELS[this.state.currentLevel];
+                const levelData = LEVELS[this.state.currentLevel]; // Ezt már jól lekéred
                 
                 this.entities.ball.reset();
                 
-                // Cél távolsága a szint szerint
+                // Cél távolsága
                 const minDistance = w * levelData.goalDistance;
-                
                 do {
                     this.entities.goal.x = Math.random() * (w - 160) + 80;
                     this.entities.goal.y = Math.random() * (h - 160) + 80;
                 } while (Math.hypot(this.entities.goal.x - this.entities.ball.x, 
                                     this.entities.goal.y - this.entities.ball.y) < minDistance);
 
-                // Power-up a szint szerint
+                // Power-up esély
                 this.entities.powerup = (Math.random() < levelData.powerupChance) ? {
                     x: Math.random() * (w - 160) + 80,
                     y: Math.random() * (h - 160) + 80,
                     active: true
                 } : null;
 
-                // Lyukak száma és sebessége a szint szerint
+                // Lyukak generálása
                 this.entities.holes = [];
                 for(let i = 0; i < levelData.holes; i++) {
-                    const hole = new Hole(w, h, this.entities.ball, this.entities.goal, 0);
+                    // A 0 helyett a tényleges szintet vagy 0-t adjunk át, 
+                    // de a lényeg, hogy a Hole konstruktora ne írja felül a mozgást!
+                    const hole = new Hole(w, h, this.entities.ball, this.entities.goal, 0); 
                     
-                    // Ha a szintnek van sebessége, akkor mozgó lyukak
                     if (levelData.holeSpeed > 0) {
                         hole.isMoving = true;
                         const angle = Math.random() * Math.PI * 2;
@@ -456,8 +443,9 @@
                         hole.range = 50 + Math.random() * 100;
                         hole.baseX = hole.x;
                         hole.baseY = hole.y;
+                    } else {
+                        hole.isMoving = false; // Kényszerítsük statikusra, ha a szint azt kéri
                     }
-                    
                     this.entities.holes.push(hole);
                 }
             },
