@@ -445,7 +445,10 @@
                 this.dom.startScreen.classList.add('opacity-0');
                 setTimeout(() => this.dom.startScreen.classList.add('hidden'), 500);
                 this.state.active = true;
-                window.addEventListener('deviceorientation', this.handleOrientation.bind(this), true);
+                window.addEventListener('deviceorientation', (e) => {
+                        this.state.tilt.beta = e.beta || 0;
+                        this.state.tilt.gamma = e.gamma || 0;
+                    }, true);
                 this.startLevel(this.state.currentLevel);
             },
 
