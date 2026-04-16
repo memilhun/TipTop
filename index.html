@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Egyensúlyozó - PWA Játék</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            touch-action: none;
+            background-color: #1a1a1a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #game-canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .error-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- UI Overlay -->
+    <div id="ui-container" class="fixed inset-0 pointer-events-none flex flex-col justify-between p-6">
+        <div class="flex justify-between items-start pointer-events-auto">
+            <div class="glass-panel text-white px-4 py-2 rounded-2xl">
+                <p class="text-xs uppercase opacity-70">Szint</p>
+                <p id="level-display" class="text-2xl font-bold">1</p>
+            </div>
+            <div class="glass-panel text-white px-4 py-2 rounded-2xl text-right">
+                <p class="text-xs uppercase opacity-70">Idő</p>
+                <p id="timer-display" class="text-2xl font-bold">0.0s</p>
+            </div>
+        </div>
+
+        <!-- Start/Error/Desktop Screen -->
+        <div id="start-screen" class="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/80 transition-opacity duration-500">
+            <div id="start-card" class="glass-panel p-8 rounded-3xl text-center max-w-md mx-4 shadow-2xl">
+                <h1 class="text-3xl font-bold text-white mb-4">Egyensúlyozó</h1>
+                
+                <!-- Desktop View -->
+                <div id="desktop-view" class="hidden">
+                    <p class="text-gray-300 mb-4">Ehhez a játékhoz a telefonod mozgásérzékelőjére van szükség.</p>
+                    <div class="bg-white p-3 rounded-xl inline-block mb-4 shadow-xl">
+                        <img id="qr-code" src="" alt="QR kód" class="w-48 h-48 bg-gray-100">
+                    </div>
+                    <p class="text-blue-400 text-sm font-semibold mb-2">Olvasd be a QR-kódot!</p>
+                    <div class="text-[10px] text-gray-500 bg-black/20 p-2 rounded break-all select-all" id="url-display"></div>
+                </div>
+
+                <!-- Mobile View -->
+                <div id="mobile-view">
+                    <p id="start-desc" class="text-gray-300 mb-8">Döntsd a telefonod a golyó irányításához. Kerüld el a lyukakat!</p>
+                    <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                        <span>JÁTÉK INDÍTÁSA</span>
+                    </button>
+                    
+                    <button id="switch-to-qr" class="mt-6 text-gray-400 text-xs underline hover:text-white transition-colors">
+                        Asztali gépen vagyok, mutasd a QR-kódot
+                    </button>
+
+                    <div id="error-msg" class="hidden mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
+                        A mozgásérzékelő nem küld adatot. HTTPS kapcsolat szükséges!
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="msg-box" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="glass-panel px-6 py-3 rounded-full text-white font-bold text-xl animate-bounce">
+                SZINT TELJESÍTVE!
+            </div>
+        </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <script>
+        const CONFIG = {
+            BALL_RADIUS: 12,
+            HOLE_RADIUS: 18,
+            GOAL_RADIUS: 25,
+            FRICTION: 0.98,
+            ACCEL_FACTOR: 0.15,
+            COLORS: {
+                BALL: '#ffffff',
+                HOLE: '#000000',
+                GOAL: '#22c55e',
+                BG: '#1a1a1a'
+            }
+        };
+
+        const state = {
+            active: false,
+            level: 1,
+            time: 0,
+            ball: { x: 0, y: 0, vx: 0, vy: 0 },
+            tilt: { beta: 0, gamma: 0 },
+            holes: [],
+            goal: { x: 0, y: 0 },
+            lastUpdate: 0,
+            canvas: null,
+            ctx: null,
+            receivedData: false
+        };
+
+        function init() {
+            state.canvas = document.getElementById('game-canvas');
+            state.ctx = state.canvas.getContext('2d');
+            resize();
+            window.addEventListener('resize', resize);
+            
+            detectDevice();
+            
+            document.getElementById('start-btn').addEventListener('click', handleStartClick);
+            document.getElementById('switch-to-qr').addEventListener('click', showDesktopQR);
+        }
+
+        function detectDevice() {
+            const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            const isMobileUA = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            
+            if (!isTouch && !isMobileUA) {
+                showDesktopQR();
+            } else {
+                updateQR();
+            }
+        }
+
+        function showDesktopQR() {
+            document.getElementById('mobile-view').classList.add('hidden');
+            document.getElementById('desktop-view').classList.remove('hidden');
+            updateQR();
+        }
+
+        function updateQR() {
+            // Megpróbáljuk kinyerni a legtisztább URL-t
+            let currentUrl = window.location.href;
+            
+            // Ha iframe-ben vagyunk, megpróbáljuk a szülő URL-t, de ha az tiltott, maradunk az eredetinél
+            try {
+                if (window.self !== window.top) {
+                    currentUrl = document.referrer || window.location.href;
+                }
+            } catch (e) {
+                currentUrl = window.location.href;
+            }
+
+            document.getElementById('url-display').innerText = currentUrl;
+            const qrImg = document.getElementById('qr-code');
+            // QR API hívása tisztított URL-lel
+            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentUrl)}&ecc=M`;
+        }
+
+        function resize() {
+            state.canvas.width = window.innerWidth;
+            state.canvas.height = window.innerHeight;
+            if (state.active) generateLevel();
+        }
+
+        async function handleStartClick() {
+            const errorBox = document.getElementById('error-msg');
+            const card = document.getElementById('start-card');
+
+            try {
+                if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission !== 'granted') throw new Error("Permission denied");
+                }
+                
+                window.addEventListener('deviceorientation', (e) => {
+                    if (e.beta !== null) state.receivedData = true;
+                }, { once: true });
+
+                startRunning();
+
+                setTimeout(() => {
+                    if (!state.receivedData && state.active) {
+                        errorBox.classList.remove('hidden');
+                        card.classList.add('error-shake');
+                    }
+                }, 2000);
+
+            } catch (err) {
+                errorBox.classList.remove('hidden');
+                card.classList.add('error-shake');
+            }
+        }
+
+        function startRunning() {
+            document.getElementById('start-screen').style.opacity = '0';
+            setTimeout(() => document.getElementById('start-screen').classList.add('hidden'), 500);
+
+            state.active = true;
+            state.level = 1;
+            state.time = 0;
+            state.lastUpdate = performance.now();
+            
+            window.addEventListener('deviceorientation', handleOrientation, true);
+            generateLevel();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function handleOrientation(event) {
+            if (event.beta !== null) state.receivedData = true;
+            state.tilt.beta = event.beta || 0;
+            state.tilt.gamma = event.gamma || 0;
+        }
+
+        function generateLevel() {
+            const w = state.canvas.width;
+            const h = state.canvas.height;
+            state.ball.x = 50; state.ball.y = 50;
+            state.ball.vx = 0; state.ball.vy = 0;
+            state.goal.x = w - 50; state.goal.y = h - 50;
+            state.holes = [];
+
+            const holeCount = 5 + (state.level * 2);
+            for (let i = 0; i < holeCount; i++) {
+                let hx, hy, attempts = 0;
+                do {
+                    hx = Math.random() * (w - 60) + 30;
+                    hy = Math.random() * (h - 60) + 30;
+                    attempts++;
+                } while ((Math.hypot(hx - 50, hy - 50) < 80 || Math.hypot(hx - (w-50), hy - (h-50)) < 80) && attempts < 100);
+                state.holes.push({ x: hx, y: hy });
+            }
+            document.getElementById('level-display').innerText = state.level;
+        }
+
+        function update(dt) {
+            if (!state.active) return;
+            state.time += dt / 1000;
+            document.getElementById('timer-display').innerText = state.time.toFixed(1) + 's';
+
+            state.ball.vx += state.tilt.gamma * CONFIG.ACCEL_FACTOR;
+            state.ball.vy += state.tilt.beta * CONFIG.ACCEL_FACTOR;
+            state.ball.vx *= CONFIG.FRICTION;
+            state.ball.vy *= CONFIG.FRICTION;
+            state.ball.x += state.ball.vx;
+            state.ball.y += state.ball.vy;
+
+            if (state.ball.x < CONFIG.BALL_RADIUS) { state.ball.x = CONFIG.BALL_RADIUS; state.ball.vx *= -0.5; }
+            if (state.ball.x > state.canvas.width - CONFIG.BALL_RADIUS) { state.ball.x = state.canvas.width - CONFIG.BALL_RADIUS; state.ball.vx *= -0.5; }
+            if (state.ball.y < CONFIG.BALL_RADIUS) { state.ball.y = CONFIG.BALL_RADIUS; state.ball.vy *= -0.5; }
+            if (state.ball.y > state.canvas.height - CONFIG.BALL_RADIUS) { state.ball.y = state.canvas.height - CONFIG.BALL_RADIUS; state.ball.vy *= -0.5; }
+
+            if (Math.hypot(state.ball.x - state.goal.x, state.ball.y - state.goal.y) < CONFIG.GOAL_RADIUS) nextLevel();
+            for (let hole of state.holes) {
+                if (Math.hypot(state.ball.x - hole.x, state.ball.y - hole.y) < CONFIG.HOLE_RADIUS - 2) {
+                    resetLevel();
+                    break;
+                }
+            }
+        }
+
+        function nextLevel() {
+            state.level++;
+            showMsg("SZINT TELJESÍTVE!");
+            generateLevel();
+        }
+
+        function resetLevel() {
+            showMsg("VIGYÁZZ!");
+            state.ball.vx = 0; state.ball.vy = 0;
+            state.ball.x = 50; state.ball.y = 50;
+        }
+
+        function showMsg(txt) {
+            const box = document.getElementById('msg-box');
+            box.firstElementChild.innerText = txt;
+            box.classList.remove('hidden');
+            setTimeout(() => box.classList.add('hidden'), 1000);
+        }
+
+        function draw() {
+            const ctx = state.ctx;
+            ctx.fillStyle = CONFIG.COLORS.BG;
+            ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+
+            for (let hole of state.holes) {
+                ctx.fillStyle = CONFIG.COLORS.HOLE;
+                ctx.beginPath(); ctx.arc(hole.x, hole.y, CONFIG.HOLE_RADIUS, 0, Math.PI * 2); ctx.fill();
+            }
+
+            ctx.fillStyle = CONFIG.COLORS.GOAL;
+            ctx.shadowBlur = 15; ctx.shadowColor = CONFIG.COLORS.GOAL;
+            ctx.beginPath(); ctx.arc(state.goal.x, state.goal.y, CONFIG.GOAL_RADIUS, 0, Math.PI * 2); ctx.fill();
+
+            ctx.fillStyle = CONFIG.COLORS.BALL;
+            ctx.shadowBlur = 10; ctx.shadowColor = "white";
+            ctx.beginPath(); ctx.arc(state.ball.x, state.ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2); ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "rgba(255,255,255,0.8)";
+            ctx.beginPath(); ctx.arc(state.ball.x - 3, state.ball.y - 3, 3, 0, Math.PI * 2); ctx.fill();
+        }
+
+        function gameLoop(timestamp) {
+            if (!state.lastUpdate) state.lastUpdate = timestamp;
+            const dt = timestamp - state.lastUpdate;
+            state.lastUpdate = timestamp;
+            update(dt);
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
