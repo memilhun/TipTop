@@ -19,6 +19,15 @@
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
+        @keyframes fade-up {
+            0% { opacity: 0; transform: translateY(20px); }
+            20% { opacity: 1; transform: translateY(0); }
+            80% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+        .bonus-anim {
+            animation: fade-up 1.5s ease-out forwards;
+        }
     </style>
 </head>
 <body>
@@ -30,6 +39,12 @@
                 <p class="text-[10px] uppercase tracking-widest opacity-50 font-bold">Pontszám</p>
                 <p id="score-display" class="text-3xl font-black">0</p>
             </div>
+            
+            <!-- Bonus Notification Area -->
+            <div id="bonus-container" class="flex-1 flex justify-center pt-2">
+                <!-- Dinamikusan ide kerülnek a bónusz üzenetek -->
+            </div>
+
             <div id="timer-card" class="glass text-white px-5 py-3 rounded-2xl text-right transition-all">
                 <p class="text-[10px] uppercase tracking-widest opacity-50 font-bold">Idő</p>
                 <p id="timer-display" class="text-3xl font-black tabular-nums">90.0s</p>
@@ -61,9 +76,6 @@
             </div>
         </div>
 
-        <!-- Notification box -->
-        <div id="msg-layer" class="absolute inset-0 flex items-center justify-center pointer-events-none"></div>
-        
         <!-- Penalty Countdown -->
         <div id="penalty-layer" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none bg-red-500/10">
             <div class="text-center">
@@ -91,7 +103,7 @@
                 BALL_RADIUS: 12,
                 HOLE_RADIUS: 18,
                 GOAL_RADIUS: 25,
-                POWERUP_RADIUS: 15
+                POWERUP_RADIUS: 20 // Slightly larger to fit text
             },
             COLORS: {
                 BALL: '#ffffff',
@@ -274,7 +286,7 @@
                     this.entities.goal.y = Math.random() * (h - 160) + 80;
                 } while (Math.hypot(this.entities.goal.x - this.entities.ball.x, this.entities.goal.y - this.entities.ball.y) < w * 0.4);
 
-                // Powerup
+                // Powerup (+5s indicator)
                 this.entities.powerup = (Math.random() < 0.35) ? {
                     x: Math.random() * (w - 160) + 80,
                     y: Math.random() * (h - 160) + 80,
@@ -310,6 +322,15 @@
                 }, 1000);
             },
 
+            showBonusToast() {
+                const container = document.getElementById('bonus-container');
+                const toast = document.createElement('div');
+                toast.className = 'glass px-4 py-1 rounded-full text-yellow-400 font-bold text-sm bonus-anim flex items-center shadow-lg border-yellow-500/30';
+                toast.innerHTML = `<span class="mr-1">⚡</span> IDŐ BÓNUSZ +5s`;
+                container.appendChild(toast);
+                setTimeout(() => toast.remove(), 1600);
+            },
+
             update(dt) {
                 if (!this.state.active || this.state.gameOver) return;
 
@@ -325,6 +346,7 @@
 
                 document.getElementById('timer-display').innerText = this.state.timeLeft.toFixed(1) + 's';
                 if (this.state.timeLeft < 10) document.getElementById('timer-card').classList.add('bg-red-600/40');
+                else document.getElementById('timer-card').classList.remove('bg-red-600/40');
 
                 if (this.state.waiting) return;
 
@@ -347,11 +369,12 @@
                     }
                 }
                 
-                // Collisions: Powerup
+                // Collisions: Powerup (+5s)
                 const p = this.entities.powerup;
                 if (p && p.active && Math.hypot(this.entities.ball.x - p.x, this.entities.ball.y - p.y) < CONFIG.ENTITIES.POWERUP_RADIUS + 10) {
                     p.active = false;
                     this.state.timeLeft += 5;
+                    this.showBonusToast();
                 }
             },
 
@@ -367,12 +390,30 @@
                 this.ctx.arc(this.entities.goal.x, this.entities.goal.y, CONFIG.ENTITIES.GOAL_RADIUS, 0, Math.PI * 2);
                 this.ctx.fill();
 
-                // Powerup
+                // Powerup (+5s label icon)
                 if (this.entities.powerup?.active) {
+                    const p = this.entities.powerup;
+                    this.ctx.save();
+                    
+                    // Glow effect
+                    this.ctx.shadowBlur = 15;
+                    this.ctx.shadowColor = CONFIG.COLORS.POWERUP;
+                    
+                    // Circular background
                     this.ctx.fillStyle = CONFIG.COLORS.POWERUP;
                     this.ctx.beginPath();
-                    this.ctx.arc(this.entities.powerup.x, this.entities.powerup.y, CONFIG.ENTITIES.POWERUP_RADIUS, 0, Math.PI * 2);
+                    this.ctx.arc(p.x, p.y, CONFIG.ENTITIES.POWERUP_RADIUS, 0, Math.PI * 2);
                     this.ctx.fill();
+                    
+                    // Text label inside
+                    this.ctx.shadowBlur = 0;
+                    this.ctx.fillStyle = '#000000';
+                    this.ctx.font = 'bold 14px sans-serif';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText('+5s', p.x, p.y);
+                    
+                    this.ctx.restore();
                 }
 
                 // Holes
