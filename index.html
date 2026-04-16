@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- CONFIGURATION ISOLATION: Nincs külső sebezhető JS lib, a Tailwind CDN fejlesztői célra megfelelő, de éles környezetben statikus build javasolt (NIST best practice). -->
-    <title>TipTop - Refactor Edition</title>
+    <title>TipTop - v1.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -137,11 +136,13 @@
         };
 
         const LEVELS = {
-            1: { name: "Bemelegítés", holes: 2, holeSpeed: 0, goalDistance: 0.3, powerupChance: 0.5, timeLimit: 30, starsThreshold: [5, 8, 12] },
-            2: { name: "Gyorsulás", holes: 3, holeSpeed: 0, goalDistance: 0.4, powerupChance: 0.4, timeLimit: 35, starsThreshold: [6, 10, 14] },
-            3: { name: "Első kihívás", holes: 3, holeSpeed: 0.5, goalDistance: 0.45, powerupChance: 0.35, timeLimit: 40, starsThreshold: [8, 12, 16] },
-            4: { name: "Labirintus", holes: 4, holeSpeed: 0.8, goalDistance: 0.5, powerupChance: 0.3, timeLimit: 45, starsThreshold: [10, 15, 20] },
-            5: { name: "Végtelen káosz", holes: 5, holeSpeed: 1.5, goalDistance: 0.6, powerupChance: 0.25, timeLimit: 60, starsThreshold: [12, 18, 25] }
+            1: { name: "LVL01", holes: 3, holeSpeed: 0, goalDistance: 0.3, powerupChance: 0.5, timeLimit: 30, starsThreshold: [5, 8, 12] },
+            2: { name: "LVL02", holes: 4, holeSpeed: 0, goalDistance: 0.4, powerupChance: 0.4, timeLimit: 35, starsThreshold: [6, 10, 14] },
+            3: { name: "LVL03", holes: 5, holeSpeed: 0.5, goalDistance: 0.45, powerupChance: 0.35, timeLimit: 40, starsThreshold: [8, 12, 16] },
+            4: { name: "LVL04", holes: 6, holeSpeed: 0.8, goalDistance: 0.5, powerupChance: 0.3, timeLimit: 45, starsThreshold: [10, 15, 20] },
+            5: { name: "LVL05", holes: 7, holeSpeed: 1.1, goalDistance: 0.6, powerupChance: 0.25, timeLimit: 60, starsThreshold: [12, 18, 25] },
+            6: { name: "LVL06", holes: 8, holeSpeed: 1.4, goalDistance: 0.7, powerupChance: 0.25, timeLimit: 60, starsThreshold: [12, 18, 25] },
+            7: { name: "LVL07", holes: 9, holeSpeed: 1.7, goalDistance: 0.7, powerupChance: 0.25, timeLimit: 60, starsThreshold: [12, 18, 25] }            
         };
 
         // ÁLLAPOTKEZELÉS
