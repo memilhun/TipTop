@@ -276,9 +276,6 @@
                 requestAnimationFrame(t => { this.lastTime = t; this.loop(t); });
             },
 
-            async requestAuth() {
-                requestWakeLock();
-            
             resize() {
                 this.canvas.width = window.innerWidth;
                 this.canvas.height = window.innerHeight;
@@ -329,6 +326,7 @@
             },
 
             async requestAuth(lvl, isSingle) {
+                requestWakeLock();
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     try {
                         const res = await DeviceOrientationEvent.requestPermission();
