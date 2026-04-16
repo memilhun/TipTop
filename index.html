@@ -184,14 +184,9 @@
                 if (keys['ArrowUp'] || keys['w']) ay -= accel * 10;
                 if (keys['ArrowDown'] || keys['s']) ay += accel * 10;
 
-                this.vx += ax;
-                this.vy += ay;
-                
-                this.vx *= CONFIG.PHYSICS.FRICTION;
-                this.vy *= CONFIG.PHYSICS.FRICTION;
-                
-                this.x += this.vx;
-                this.y += this.vy;
+                this.vx += ax; this.vy += ay;
+                this.vx *= CONFIG.PHYSICS.FRICTION; this.vy *= CONFIG.PHYSICS.FRICTION;
+                this.x += this.vx; this.y += this.vy;
 
                 this.handleBounds(bounds);
             }
