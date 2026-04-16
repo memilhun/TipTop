@@ -143,10 +143,21 @@
             8: { holes: 11, holeSpeed: 2.0, goalDistance: 0.8, powerupChance: 0.1, timeLimit: 60, starsThreshold: [15, 22, 30] },
             9: { holes: 13, holeSpeed: 2.5, goalDistance: 0.8, powerupChance: 0.1, timeLimit: 60, starsThreshold: [15, 25, 35] }
         };
-
+        
+        // ÁLLAPOTKEZELÉS
+        let wakeLock = null;
+        
         const currentTilt = { beta: 0, gamma: 0 };
         const keys = {};
 
+        const requestWakeLock = async () => {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) { console.warn('WakeLock hiba'); }
+        };
+        
         class Ball {
             constructor() { this.reset(); }
             reset() {
@@ -265,6 +276,9 @@
                 requestAnimationFrame(t => { this.lastTime = t; this.loop(t); });
             },
 
+            async requestAuth() {
+                requestWakeLock();
+            
             resize() {
                 this.canvas.width = window.innerWidth;
                 this.canvas.height = window.innerHeight;
