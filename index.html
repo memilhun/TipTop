@@ -146,6 +146,14 @@
             return (n >= 0 && n <= 3) ? n : 0;
         }
 
+        function haptic(type = 'light') {
+            if (navigator.vibrate) {
+                if (type === 'light') navigator.vibrate(10);
+                if (type === 'medium') navigator.vibrate(20);
+                if (type === 'heavy') navigator.vibrate(40);
+            }
+        }
+        
         class Ball {
             constructor() { this.reset(); }
             reset() { this.x = 60; this.y = 60; this.vx = 0; this.vy = 0; this.radius = CONFIG.ENTITIES.BALL_RADIUS; }
@@ -493,6 +501,7 @@
 
                 if (Math.hypot(ball.x - goal.x, ball.y - goal.y) < CONFIG.ENTITIES.GOAL_RADIUS) {
                     this.state.levelScore++;
+                    haptic('medium');
                     this.dom.score.innerText = this.state.levelScore;
                     this.generateLevel();
                 }
@@ -501,6 +510,7 @@
                     if (Math.hypot(ball.x - h.x, ball.y - h.y) < CONFIG.ENTITIES.HOLE_RADIUS - 2) {
                         this.state.waiting          = true;
                         this.state.penaltyRemaining = 2.5;
+                        haptic('heavy');
                         this.dom.penaltyLayer.classList.remove('hidden');
                         break;
                     }
