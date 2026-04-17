@@ -588,10 +588,11 @@
 
                 // Power-up
                 if (this.entities.powerup?.active) {
-                    this.ctx.fillStyle = CONFIG.COLORS.POWERUP;
-                    this.ctx.beginPath();
-                    this.ctx.arc(this.entities.powerup.x, this.entities.powerup.y, CONFIG.ENTITIES.POWERUP_RADIUS, 0, Math.PI * 2);
-                    this.ctx.fill();
+                    this.ctx.fillStyle = '#fbbf24';
+                    this.ctx.font = 'bold 16px sans-serif';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText('+5mp', this.entities.powerup.x, this.entities.powerup.y);
                 }
 
                 this.entities.holes.forEach(h => h.draw(this.ctx));
